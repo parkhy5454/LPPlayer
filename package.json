@@ -1,6 +1,7 @@
 {
-  "name": "lpplayer-icon-final",
-  "version": "8.0.0",
+  "name": "lpplayer-final-all-fixed",
+  "version": "9.0.0",
+  "type": "module",
   "dependencies": {
     "@neondatabase/serverless": "^0.10.0",
     "@vercel/blob": "^0.23.0",
