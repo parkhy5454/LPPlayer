@@ -363,6 +363,10 @@
       <section class="view" id="view-upload" aria-label="upload">
         <div class="card">
           <h2 data-i18n="uploadTitle">파일 업로드</h2>
+          <input class="field" id="titleInput" type="text" maxlength="80"
+                 data-i18n-ph="titlePh" placeholder="제목 (선택, 한 곡일 때)">
+          <input class="field" id="artistInput" type="text" maxlength="80"
+                 data-i18n-ph="artistPh" placeholder="아티스트 (선택)">
           <input class="field" id="yearInput" type="number" inputmode="numeric" min="1900" max="2100"
                  data-i18n-ph="yearPh" placeholder="연도 (선택)">
           <button class="btn" id="pickBtn" type="button" data-i18n="pickFiles">파일 선택 (여러 개 가능)</button>
@@ -489,7 +493,8 @@
         pickFiles: '파일 선택 (여러 개 가능)',
         uploading: '업로드 중…', saving: '저장 중…', timeout: '응답이 없습니다 (시간 초과)', done: '완료', badType: '오디오 파일이 아닙니다',
         uploadProgress: (n, t) => `${n} / ${t} 업로드 중`,
-        uploadOk: (n) => `${n}곡 업로드 완료`,
+        uploadOk: (n) => `${n}곡 업로드 되었습니다 - 영구 저장됨`,
+        titlePh: '제목 (선택, 한 곡일 때)', artistPh: '아티스트 (선택)',
         uploadFail: '업로드 실패',
         language: '언어', install: '홈 화면에 설치', installBtn: '설치',
         installed: '이미 설치되어 있습니다',
@@ -513,7 +518,8 @@
         pickFiles: 'Choose files (multiple allowed)',
         uploading: 'Uploading…', saving: 'Saving…', timeout: 'No response (timed out)', done: 'Done', badType: 'Not an audio file',
         uploadProgress: (n, t) => `Uploading ${n} / ${t}`,
-        uploadOk: (n) => `${n} track(s) uploaded`,
+        uploadOk: (n) => `${n} track(s) uploaded - saved permanently`,
+        titlePh: 'Title (optional, single track)', artistPh: 'Artist (optional)',
         uploadFail: 'Upload failed',
         language: 'Language', install: 'Add to Home Screen', installBtn: 'Install',
         installed: 'Already installed',
@@ -921,13 +927,15 @@
       if (!putRes.ok) throw new Error(T('uploadFail'));
       const blob = JSON.parse(putText);
 
-      const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 80) || 'Untitled';
+      const fromName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 80);
+      const title = meta.title || fromName || 'Untitled';
       if (onPct) onPct(T('saving'));
-      await api('/api/songs', {
+      const saved = await api('/api/songs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, url: blob.url, size: file.size, lyrics: meta.lyrics || null, year: meta.year || null })
+        body: JSON.stringify({ title, artist: meta.artist || null, url: blob.url, size: file.size, lyrics: meta.lyrics || null, year: meta.year || null })
       });
+      return saved.song;
     }
 
     let busy = false;
@@ -950,8 +958,12 @@
       }
       const yearVal = parseInt($('#yearInput').value, 10);
       const year = yearVal >= 1900 && yearVal <= 2100 ? yearVal : null;
+      const artist = $('#artistInput').value.trim() || null;
+      // a typed title only makes sense for a single file; several files keep their own names
+      const titleOne = valid.length === 1 ? $('#titleInput').value.trim() || null : null;
 
       let okCount = 0;
+      let firstId = null;
       for (let i = 0; i < valid.length; i++) {
         const f = valid[i];
         const row = logRow(f.name);
@@ -959,7 +971,9 @@
         try {
           const lrc = lrcs.get(baseName(f.name));
           const lyrics = lrc ? await lrc.text() : null;
-          await uploadOne(f, (v) => row.set('', typeof v === 'number' ? `${v}%` : v), { lyrics, year });
+          const song = await uploadOne(f, (v) => row.set('', typeof v === 'number' ? `${v}%` : v),
+            { lyrics, year, artist, title: titleOne });
+          if (!firstId && song) firstId = song.id;
           okCount++;
           row.set('ok', T('done'));
         } catch (e) {
@@ -969,11 +983,21 @@
       }
 
       $('#fileInput').value = '';
+      $('#titleInput').value = '';
+      $('#artistInput').value = '';
       $('#pickBtn').textContent = T('pickFiles');
       $('#pickBtn').disabled = false;
       busy = false;
       await loadSongs();
-      if (okCount) toast(T('uploadOk', okCount));
+      if (okCount) {
+        toast(T('uploadOk', okCount));
+        // success: close the upload page, go home and start the first new track
+        setTimeout(() => {
+          showView('home');
+          const at = songs.findIndex((s) => s.id === firstId);
+          if (at >= 0) playIndex(at);
+        }, 1200);
+      }
     }
 
     $('#pickBtn').addEventListener('click', () => $('#fileInput').click());
