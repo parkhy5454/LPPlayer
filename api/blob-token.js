@@ -25,6 +25,19 @@ export default async function handler(req, res) {
       },
     });
   }
+  // format check only: never echo the value
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN || '';
+  if (blobToken && (!blobToken.startsWith('vercel_blob_rw_') || /[\s"']/.test(blobToken))) {
+    return res.status(500).json({
+      error: 'BLOB_READ_WRITE_TOKEN looks malformed: remove quotes, spaces and line breaks around the value',
+      diagnostics: {
+        length: blobToken.length,
+        startsWithPrefix: blobToken.startsWith('vercel_blob_rw_'),
+        containsSpaceOrQuote: /[\s"']/.test(blobToken),
+      },
+    });
+  }
+
   try {
     // Vercel usually parses the JSON body already; read the stream if it did not
     let body = req.body;
