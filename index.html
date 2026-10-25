@@ -119,14 +119,13 @@
       background: var(--accent); color: #000;
       display: grid; place-items: center;
       font-weight: 700; font-size: 16px;
-      background-size: cover; background-position: center;
     }
-    /* the playing song's title is printed on the label and turns with the record */
-    .label-title {
-      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-      width: 78%; font-size: 12px; line-height: 1.2; text-align: center; overflow-wrap: anywhere;
+    /* the playing song's title runs around the black groove area and turns with the record */
+    .vinyl { position: relative; }
+    .vinyl-text {
+      position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;
+      fill: #9a9a9a; font-size: 4px; font-weight: 600; letter-spacing: .03em;
     }
-    .vinyl .label.has-cover { color: #fff; box-shadow: inset 0 0 0 999px rgba(0, 0, 0, .45); }
     .vinyl.spin { animation: spin 1.8s linear infinite; }   /* 33 1/3 RPM = one turn every 1.8 s */
     .vinyl.paused { animation-play-state: paused; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -178,7 +177,7 @@
     @keyframes floatUp { to { transform: translateY(-180px); opacity: 0; } }
     .field { display: block; width: 100%; box-sizing: border-box; min-height: var(--tap); margin: 10px 0 0; padding: 0 14px; border-radius: 12px; border: 1px solid var(--muted); background: transparent; color: inherit; font-size: 16px; }
     body.privacy .t, body.privacy .a, body.privacy .np-title, body.privacy .np-artist,
-    body.privacy .np-big, body.privacy .np-sub, body.privacy .lyrics, body.privacy .label-title { filter: blur(6px); user-select: none; }
+    body.privacy .np-big, body.privacy .np-sub, body.privacy .lyrics, body.privacy .vinyl-text { filter: blur(6px); user-select: none; }
 
     /* ---------- player bar (one-hand zone) ---------- */
     .player {
@@ -380,7 +379,7 @@
       <!-- HOME -->
       <section class="view active" id="view-home" aria-label="home">
         <div class="stage" id="stage">
-          <div class="vinyl paused" id="vinyl"><div class="label"><span class="label-title" id="labelTitle">LP</span></div></div>
+          <div class="vinyl paused" id="vinyl"><div class="label">LP</div><svg class="vinyl-text" viewBox="0 0 100 100" aria-hidden="true"><defs><path id="ringPath" d="M50,22 A28,28 0 1,1 50,78 A28,28 0 1,1 50,22"/></defs><text><textPath id="ringText" href="#ringPath"></textPath></text></svg></div>
           <p class="np-big" id="bigTitle">—</p>
           <p class="np-sub" id="bigArtist"></p>
           <div class="lyrics" id="lyrics" hidden>
@@ -1466,15 +1465,12 @@
       $('#bigTitle').textContent = title;
       $('#bigArtist').textContent = artist;
       const playing = !!s && !audio.paused;
-      $('#playIcon').innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
-      $('#playBtn').setAttribute('aria-label', playing ? T('pause') : T('play'));
-      // the cover, when there is one, becomes the record label
-      const label = $('#vinyl .label');
-      label.style.backgroundImage = s && s.cover_url ? `url("${s.cover_url}")` : '';
-      label.classList.toggle('has-cover', !!(s && s.cover_url));
-      $('#labelTitle').textContent = s ? (s.title || 'Untitled') : 'LP';
       $('#vinyl').classList.toggle('spin', playing);
       $('#vinyl').classList.toggle('paused', !playing);
+      $('#playIcon').innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
+      $('#playBtn').setAttribute('aria-label', playing ? T('pause') : T('play'));
+      // the title is printed around the black groove area and turns with the record
+      $('#ringText').textContent = s ? `${s.title || 'Untitled'}  ·  `.repeat(4) : '';
       $('#prevBtn').setAttribute('aria-label', T('prev'));
       $('#nextBtn').setAttribute('aria-label', T('next'));
       $('#prevBtn').disabled = !room && !songs.length;
