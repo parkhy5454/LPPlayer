@@ -1,8 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import { signToken, NOT_CONFIGURED } from '../../lib/auth.js';
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { EMAIL, cleanName, cleanPhone, ensureUserColumns } from '../../lib/profile.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -18,6 +17,10 @@ export default async function handler(req, res) {
     const password = String(body.password || '');
     if (!EMAIL.test(email)) return res.status(400).json({ error: '이메일 형식이 올바르지 않습니다' });
     if (password.length < 8) return res.status(400).json({ error: '비밀번호는 8자 이상이어야 합니다' });
+    const name = cleanName(body.name);
+    const phone = cleanPhone(body.phone);
+    if (!name) return res.status(400).json({ error: '이름을 입력해 주세요 (20자 이하)' });
+    if (!phone) return res.status(400).json({ error: '휴대폰 번호를 확인해 주세요 (010으로 시작)' });
 
     const sql = neon(process.env.DATABASE_URL);
     await sql`CREATE TABLE IF NOT EXISTS users (
@@ -26,12 +29,13 @@ export default async function handler(req, res) {
       password_hash TEXT NOT NULL,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )`;
+    await ensureUserColumns(sql);
     const hash = await bcrypt.hash(password, 10);
-    const rows = await sql`INSERT INTO users (email, password_hash) VALUES (${email}, ${hash})
-                           ON CONFLICT (email) DO NOTHING RETURNING id, email`;
+    const rows = await sql`INSERT INTO users (email, password_hash, name, phone) VALUES (${email}, ${hash}, ${name}, ${phone})
+                           ON CONFLICT (email) DO NOTHING RETURNING id, email, name`;
     if (!rows.length) return res.status(409).json({ error: '이미 가입된 이메일입니다' });
 
-    return res.status(200).json({ token: signToken(rows[0]), user: { id: rows[0].id, email: rows[0].email } });
+    return res.status(200).json({ token: signToken(rows[0]), user: { id: rows[0].id, email: rows[0].email, name: rows[0].name } });
   } catch (e) {
     console.error('register error', e);
     return res.status(500).json({ error: e.message });
