@@ -139,6 +139,15 @@
     .chips::-webkit-scrollbar { display: none; }
     .chip { flex: none; min-height: var(--tap); padding: 0 16px; border-radius: 999px; border: 1px solid var(--muted); background: transparent; color: inherit; font-size: 16px; }
     .chip.on { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
+    .room-code { font-size: 44px; font-weight: 800; letter-spacing: .12em; text-align: center; margin: 4px 0 12px; }
+    .avatars { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 12px; }
+    .avatar { width: var(--tap); height: var(--tap); border-radius: 50%; background: var(--accent); color: #000; display: grid; place-items: center; font-weight: 800; }
+    .reacts { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; }
+    .react-btn { min-width: var(--tap); min-height: var(--tap); border-radius: 50%; border: 1px solid var(--muted); background: transparent; font-size: 22px; }
+    #roomPanel .btn { margin-top: 10px; }
+    .float-layer { position: fixed; left: 0; right: 0; bottom: 200px; height: 0; pointer-events: none; }
+    .float-emoji { position: absolute; bottom: 0; font-size: 34px; animation: floatUp 1.5s ease-out forwards; }
+    @keyframes floatUp { to { transform: translateY(-180px); opacity: 0; } }
     .field { display: block; width: 100%; box-sizing: border-box; min-height: var(--tap); margin: 10px 0 0; padding: 0 14px; border-radius: 12px; border: 1px solid var(--muted); background: transparent; color: inherit; font-size: 16px; }
     body.privacy .t, body.privacy .a, body.privacy .np-title, body.privacy .np-artist,
     body.privacy .np-big, body.privacy .np-sub, body.privacy .lyrics { filter: blur(6px); user-select: none; }
@@ -376,6 +385,30 @@
         </div>
       </section>
 
+      <!-- TOGETHER: one host controls playback, members follow -->
+      <section class="view" id="view-together" aria-label="together">
+        <div class="card" id="roomEntry">
+          <button class="btn" id="makeRoomBtn" type="button" data-i18n="makeRoom">방 만들기</button>
+          <input class="field" id="joinCode" type="text" inputmode="numeric" maxlength="6" autocomplete="off"
+                 data-i18n-ph="codePh" placeholder="6자리 코드">
+          <button class="btn btn-secondary" id="joinBtn" type="button" data-i18n="join">참가</button>
+        </div>
+        <div class="card" id="roomPanel" hidden>
+          <p class="room-code" id="roomCode"></p>
+          <div class="avatars" id="members"></div>
+          <div class="reacts" id="reacts"></div>
+          <button class="btn btn-secondary" id="shareBtn" type="button" data-i18n="share">코드 공유</button>
+          <div id="hostBox" hidden>
+            <h2 data-i18n="queueTitle">내 곡</h2>
+            <div class="list" id="hostSongs"></div>
+          </div>
+          <h2 data-i18n="queueNext">다음 곡</h2>
+          <ul class="log" id="roomQueue"></ul>
+          <button class="btn btn-secondary" id="leaveBtn" type="button" data-i18n="leaveRoom">방 나가기</button>
+        </div>
+        <div class="float-layer" id="floatLayer"></div>
+      </section>
+
       <!-- SETTINGS -->
       <section class="view" id="view-settings" aria-label="settings">
         <div class="card">
@@ -445,6 +478,10 @@
         <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
         <span data-i18n="tabUpload">업로드</span>
       </button>
+      <button class="tab" type="button" data-view="together" aria-current="false">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5M14.5 15.2c2.6.1 5.5 1.6 5.5 4.8"/></svg>
+        <span data-i18n="tabTogether">함께</span>
+      </button>
       <button class="tab" type="button" data-view="settings" aria-current="false">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
         <span data-i18n="tabSettings">설정</span>
@@ -502,7 +539,11 @@
         rotate: '세로 모드로 돌려주세요',
         playFail: '재생할 수 없는 파일입니다',
         tooBig: '500MB를 넘는 파일입니다',
-        yearPh: '연도 (선택)', yearAll: '전체', privacyTitle: '개인정보 보호 모드', privacyOn: '켜짐', privacyOff: '꺼짐'
+        yearPh: '연도 (선택)', yearAll: '전체', privacyTitle: '개인정보 보호 모드', privacyOn: '켜짐', privacyOff: '꺼짐',
+        tabTogether: '함께', makeRoom: '방 만들기', join: '참가', codePh: '6자리 코드', codeBad: '6자리 숫자 코드를 입력하세요',
+        share: '코드 공유', copied: '코드를 복사했습니다', shareText: 'LPPlayer 함께 듣기 코드', leaveRoom: '방 나가기',
+        roomEnded: '방이 종료되었습니다', hostOnly: '방장만 조작할 수 있습니다', queueAdd: '다음 곡에 추가',
+        queueTitle: '내 곡', queueNext: '다음 곡', tapToPlay: '화면을 눌러 재생을 시작하세요'
       },
       en: {
         tabHome: 'Home', tabLib: 'Library', tabUpload: 'Upload', tabSettings: 'Settings',
@@ -527,7 +568,11 @@
         rotate: 'Please rotate to portrait',
         playFail: 'This file cannot be played',
         tooBig: 'File is larger than 500 MB',
-        yearPh: 'Year (optional)', yearAll: 'All', privacyTitle: 'Privacy mode', privacyOn: 'On', privacyOff: 'Off'
+        yearPh: 'Year (optional)', yearAll: 'All', privacyTitle: 'Privacy mode', privacyOn: 'On', privacyOff: 'Off',
+        tabTogether: 'Together', makeRoom: 'Create room', join: 'Join', codePh: '6-digit code', codeBad: 'Enter the 6-digit number code',
+        share: 'Share code', copied: 'Code copied', shareText: 'Listen together on LPPlayer, code', leaveRoom: 'Leave room',
+        roomEnded: 'The room has ended', hostOnly: 'Only the host can control playback', queueAdd: 'Add to next',
+        queueTitle: 'My tracks', queueNext: 'Up next', tapToPlay: 'Tap the screen to start playing'
       }
     };
 
@@ -740,6 +785,170 @@
       applyPrivacy();
     });
 
+    /* ---------------- together (Mixtape): one host, members follow ---------------- */
+    const REACTIONS_LIST = ['❤️', '🔥', '😭', '👏'];
+    let room = null;          // {code, isHost} while in a room
+    let roomTimer = null;
+    let roomSongId = null;
+    let roomSongInfo = null;  // the room's current track, shown in the player
+    let lastReactionId = 0;
+
+    function roomGuard() {
+      if (room && !room.isHost) { toast(T('hostOnly')); return true; }
+      return false;
+    }
+    async function roomControl(action, extra = {}) {
+      if (!room) return;
+      try {
+        await api('/api/rooms?action=control', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: room.code, action, ...extra })
+        });
+        syncRoom();
+      } catch (e) { toast(e.message); }
+    }
+    function enterRoom(code, isHost) {
+      room = { code, isHost };
+      roomSongId = null;
+      roomSongInfo = null;
+      lastReactionId = 0;
+      $('#roomEntry').hidden = true;
+      $('#roomPanel').hidden = false;
+      $('#roomCode').textContent = code;
+      $('#hostBox').hidden = !isHost;
+      renderHostSongs();
+      clearInterval(roomTimer);
+      roomTimer = setInterval(syncRoom, 2000);
+      syncRoom();
+    }
+    function exitRoom(message) {
+      if (room) {
+        api('/api/rooms?action=leave', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: room.code }) }).catch(() => {});
+      }
+      clearInterval(roomTimer);
+      room = null;
+      roomSongId = null;
+      roomSongInfo = null;
+      $('#roomEntry').hidden = false;
+      $('#roomPanel').hidden = true;
+      audio.pause();
+      updatePlayer();
+      if (message) toast(message);
+    }
+    function renderHostSongs() {
+      const box = $('#hostSongs');
+      box.textContent = '';
+      if (!room || !room.isHost) return;
+      if (!songs.length) { box.append(el('p', { class: 'empty' }, T('noSongs'))); return; }
+      songs.forEach((s) => {
+        const main = el('button', { class: 'row-main', type: 'button', 'aria-label': s.title || '' },
+          el('span', { class: 'meta' },
+            el('span', { class: 't' }, s.title || 'Untitled'),
+            el('span', { class: 'a' }, s.artist || T('artistUnknown'))));
+        main.addEventListener('click', () => roomControl('song', { songId: s.id }));
+        const add = el('button', { class: 'del', type: 'button', 'aria-label': T('queueAdd') }, '+');
+        add.addEventListener('click', () => roomControl('queue', { songId: s.id }));
+        box.append(el('div', { class: 'row' }, main, add));
+      });
+    }
+    function renderRoomPeople(st) {
+      const box = $('#members');
+      box.textContent = '';
+      st.members.forEach((email) => box.append(el('span', { class: 'avatar' }, (email[0] || '?').toUpperCase())));
+    }
+    function renderRoomQueue(queue) {
+      const ul = $('#roomQueue');
+      ul.textContent = '';
+      queue.forEach((q) => ul.append(el('li', {},
+        el('span', { class: 'n' }, q.title || 'Untitled'),
+        el('span', { class: 's' }, q.artist || ''))));
+    }
+    function showReactions(list) {
+      for (const r of list) {
+        if (r.id <= lastReactionId) continue;
+        lastReactionId = r.id;
+        const f = el('span', { class: 'float-emoji' }, r.emoji);
+        f.style.left = (15 + Math.random() * 70) + '%';
+        $('#floatLayer').append(f);
+        setTimeout(() => f.remove(), 1600);
+      }
+    }
+    async function roomReact(emoji) {
+      if (!room) return;
+      try {
+        await api('/api/rooms?action=react', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: room.code, emoji }) });
+        syncRoom();
+      } catch (e) { toast(e.message); }
+    }
+    // poll the room every 2 s; the audio follows the server clock (updatedAt / serverNow)
+    async function syncRoom() {
+      if (!room) return;
+      let st;
+      try {
+        st = await api(`/api/rooms?action=state&code=${encodeURIComponent(room.code)}`);
+      } catch (e) {
+        if (room && /not found|ended/.test(e.message)) exitRoom(T('roomEnded'));
+        return;
+      }
+      if (!room) return;
+      if (st.isHost !== room.isHost) {
+        room.isHost = st.isHost;
+        $('#hostBox').hidden = !room.isHost;
+        renderHostSongs();
+      }
+      renderRoomPeople(st);
+      renderRoomQueue(st.queue);
+      showReactions(st.reactions);
+      if (!st.song) { roomSongInfo = null; updatePlayer(); return; }
+      if (roomSongId !== st.song.id) {
+        roomSongId = st.song.id;
+        roomSongInfo = st.song;
+        audio.src = st.song.url;
+        setLyrics(st.song);
+        updatePlayer();
+      }
+      if (audio.readyState < 1) return;   // metadata not loaded yet; loadedmetadata triggers another sync
+      const expected = st.position + (st.playing ? Math.max(0, (Date.parse(st.serverNow) - Date.parse(st.updatedAt)) / 1000) : 0);
+      if (st.playing) {
+        if (Math.abs(audio.currentTime - expected) > 1) audio.currentTime = expected;
+        if (audio.paused) playAudio();
+      } else {
+        if (!audio.paused) audio.pause();
+        if (Math.abs(audio.currentTime - st.position) > 0.3) audio.currentTime = st.position;
+      }
+    }
+
+    $('#makeRoomBtn').addEventListener('click', async () => {
+      try {
+        const d = await api('/api/rooms?action=create', { method: 'POST' });
+        enterRoom(d.code, true);
+      } catch (e) { toast(e.message); }
+    });
+    $('#joinBtn').addEventListener('click', async () => {
+      const code = $('#joinCode').value.trim();
+      if (!/^\d{6}$/.test(code)) return toast(T('codeBad'));
+      try {
+        await api('/api/rooms?action=join', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }) });
+        enterRoom(code, false);
+      } catch (e) { toast(e.message); }
+    });
+    $('#leaveBtn').addEventListener('click', () => exitRoom(''));
+    $('#shareBtn').addEventListener('click', async () => {
+      if (!room) return;
+      try {
+        if (navigator.share) await navigator.share({ title: 'LPPlayer', text: `${T('shareText')} ${room.code}` });
+        else { await navigator.clipboard.writeText(room.code); toast(T('copied')); }
+      } catch {}
+    });
+    REACTIONS_LIST.forEach((e) => {
+      const b = el('button', { class: 'react-btn', type: 'button', 'aria-label': e }, e);
+      b.addEventListener('click', () => roomReact(e));
+      $('#reacts').append(b);
+    });
+
     /* ---------------- playback ---------------- */
     function playIndex(i) {
       if (!songs.length) return;
@@ -758,15 +967,24 @@
       const p = audio.play();
       if (p && p.catch) p.catch((e) => {
         // AbortError = a newer track replaced this one; that is not a failure
-        if (e && e.name !== 'AbortError') toast(T('playFail'));
+        if (e && e.name === 'NotAllowedError' && room) toast(T('tapToPlay'));
+        else if (e && e.name !== 'AbortError') toast(T('playFail'));
       });
     }
     function togglePlay() {
+      if (roomGuard()) return;
+      if (room) return roomControl(audio.paused ? 'play' : 'pause', { position: audio.currentTime });
       if (idx < 0) return playIndex(0);
       if (audio.paused) playAudio(); else audio.pause();
     }
-    function next() { playIndex(idx + 1); }
+    function next() {
+      if (roomGuard()) return;
+      if (room) return roomControl('next');
+      playIndex(idx + 1);
+    }
     function prev() {
+      if (roomGuard()) return;
+      if (room) return roomControl('seek', { position: 0 });
       if (audio.currentTime > 3) { audio.currentTime = 0; return; }   // like real players
       playIndex(idx - 1);
     }
@@ -775,7 +993,7 @@
     const PAUSE_SVG = '<rect x="6" y="5" width="4.2" height="14" rx="1"/><rect x="13.8" y="5" width="4.2" height="14" rx="1"/>';
 
     function updatePlayer() {
-      const s = songs[idx];
+      const s = room ? roomSongInfo : songs[idx];
       const title = s ? (s.title || 'Untitled') : T('nothing');
       const artist = s ? (s.artist || T('artistUnknown')) : '';
       $('#npTitle').textContent = title;
@@ -789,15 +1007,19 @@
       $('#vinyl').classList.toggle('paused', !playing);
       $('#prevBtn').setAttribute('aria-label', T('prev'));
       $('#nextBtn').setAttribute('aria-label', T('next'));
-      $('#prevBtn').disabled = !songs.length;
-      $('#nextBtn').disabled = !songs.length;
+      $('#prevBtn').disabled = !room && !songs.length;
+      $('#nextBtn').disabled = !room && !songs.length;
     }
 
     audio.addEventListener('play', updatePlayer);
     audio.addEventListener('pause', updatePlayer);
-    audio.addEventListener('ended', next);
+    audio.addEventListener('ended', () => {
+      if (room) { if (room.isHost) roomControl('next'); return; }   // in a room only the host advances
+      next();
+    });
     audio.addEventListener('loadedmetadata', () => {
       $('#tDur').textContent = fmt(audio.duration);
+      if (room) syncRoom();
     });
     audio.addEventListener('timeupdate', () => {
       $('#tCur').textContent = fmt(audio.currentTime);
@@ -807,7 +1029,12 @@
     audio.addEventListener('error', () => { if (idx >= 0 && audio.error && audio.error.code !== 1) toast(T('playFail')); });
 
     $('#seek').addEventListener('input', (e) => {
-      if (audio.duration) audio.currentTime = (e.target.value / 1000) * audio.duration;
+      if (room || !audio.duration) return;   // in a room the slider only sends on release
+      audio.currentTime = (e.target.value / 1000) * audio.duration;
+    });
+    $('#seek').addEventListener('change', (e) => {
+      if (!room || !audio.duration || roomGuard()) return;
+      roomControl('seek', { position: (e.target.value / 1000) * audio.duration });
     });
     $('#playBtn').addEventListener('click', togglePlay);
     $('#nextBtn').addEventListener('click', next);
@@ -852,6 +1079,7 @@
         b.setAttribute('aria-current', on ? 'page' : 'false');
       });
       $('#main').scrollTop = 0;
+      if (name === 'together') renderHostSongs();
     }
     document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
 
