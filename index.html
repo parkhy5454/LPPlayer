@@ -793,7 +793,7 @@
         body: JSON.stringify({ type: 'blob.generate-client-token', payload: { pathname, callbackUrl: location.origin + '/api/blob-token', multipart: false, clientPayload } })
       });
       const tok = await tokRes.json().catch(() => ({}));
-      if (!tokRes.ok || !tok.clientToken) throw new Error(`[token ${tokRes.status}] ${tok.error || ''}`.trim());
+      if (!tokRes.ok || !tok.clientToken) throw new Error(tok.error || T('uploadFail'));
       // 2) the browser sends the file straight to Blob; a 3-minute limit stops a stalled transfer
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), 180000);
@@ -815,10 +815,9 @@
         putText = await putRes.text();
       } catch (err) {
         if (err.name === 'AbortError') throw new Error(T('timeout'));
-        throw new Error(`[network] ${err.message}`);
+        throw err;
       } finally { clearTimeout(timer); }
-      // on failure show Blob's own status and reply so the cause is visible on screen
-      if (!putRes.ok) throw new Error(`[blob ${putRes.status}] ${putText.slice(0, 300)}`);
+      if (!putRes.ok) throw new Error(T('uploadFail'));
       const blob = JSON.parse(putText);
 
       const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 80) || 'Untitled';

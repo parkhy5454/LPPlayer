@@ -13,29 +13,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'POST only' });
   }
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    // diagnostics only: names and yes/no, never values
-    return res.status(500).json({
-      error: 'BLOB_READ_WRITE_TOKEN is not set',
-      diagnostics: {
-        commit: (process.env.VERCEL_GIT_COMMIT_SHA || 'unknown').slice(0, 7),
-        environment: process.env.VERCEL_ENV || 'unknown',
-        JWT_SECRET: Boolean(process.env.JWT_SECRET),
-        DATABASE_URL: Boolean(process.env.DATABASE_URL),
-        blobVariableNamesSeen: Object.keys(process.env).filter((k) => k.includes('BLOB')),
-      },
-    });
-  }
-  // format check only: never echo the value
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN || '';
-  if (blobToken && (!blobToken.startsWith('vercel_blob_rw_') || /[\s"']/.test(blobToken))) {
-    return res.status(500).json({
-      error: 'BLOB_READ_WRITE_TOKEN looks malformed: remove quotes, spaces and line breaks around the value',
-      diagnostics: {
-        length: blobToken.length,
-        startsWithPrefix: blobToken.startsWith('vercel_blob_rw_'),
-        containsSpaceOrQuote: /[\s"']/.test(blobToken),
-      },
-    });
+    return res.status(500).json({ error: 'BLOB_READ_WRITE_TOKEN is not set' });
   }
 
   try {
