@@ -4,8 +4,8 @@
       "source": "/(.*)",
       "headers": [
         {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' https:; media-src 'self' blob: https://*.public.blob.vercel-storage.com https://*.itunes.apple.com https://audio-ssl.itunes.apple.com; connect-src 'self' https://*.neon.tech https://*.vercel-storage.com https://itunes.apple.com https://lrclib.net; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https:;"
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
         }
       ]
     }

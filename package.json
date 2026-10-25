@@ -1,6 +1,6 @@
 {
-  "name": "lpplayer-clean-tabs",
-  "version": "3.0.0",
+  "name": "lpplayer-auth-admin",
+  "version": "4.0.0",
   "dependencies": {
     "@neondatabase/serverless": "^0.10.0",
     "@vercel/blob": "^0.23.0",
