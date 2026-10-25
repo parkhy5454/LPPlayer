@@ -3,19 +3,18 @@
   "short_name": "LPPlayer",
   "display": "standalone",
   "background_color": "#000000",
-  "theme_color": "#1DB954",
+  "theme_color": "#000000",
   "start_url": "./",
   "orientation": "portrait",
-  "scope": "./",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/138/138406.png",
+      "src": "./icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/138/138406.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

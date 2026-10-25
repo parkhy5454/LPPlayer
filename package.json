@@ -1,7 +1,6 @@
 {
-  "name": "lpplayer-mobile-optimized",
-  "version": "7.0.0",
-  "type": "module",
+  "name": "lpplayer-icon-final",
+  "version": "8.0.0",
   "dependencies": {
     "@neondatabase/serverless": "^0.10.0",
     "@vercel/blob": "^0.23.0",
