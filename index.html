@@ -804,7 +804,8 @@
           headers: {
             authorization: `Bearer ${tok.clientToken}`,
             'x-api-version': '7',
-            'x-api-blob-request-id': `${Math.random().toString(16).slice(2)}:${Date.now()}`,
+            // same format the SDK uses: <store id from the token>:<time>:<random>
+            'x-api-blob-request-id': `${tok.clientToken.split('_')[3] || ''}:${Date.now()}:${Math.random().toString(16).slice(2)}`,
             'x-api-blob-request-attempt': '0',
             'x-content-type': mimeFor(file)
           },
