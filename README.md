@@ -14,7 +14,6 @@
 | `api/songs.js` | 내 곡 목록 / 저장 / 삭제 (계정별로 분리) |
 | `api/blob-token.js` | 업로드 토큰 발급 (로그인 확인 후) |
 | `lib/auth.js` | 토큰 발급과 확인 |
-| `vendor/blob-client.js` | 브라우저용 `@vercel/blob` 클라이언트 (빌드 산출물) |
 | `sw.js`, `manifest.json` | PWA (설치, 셸 캐시) |
 
 ## API
@@ -40,10 +39,3 @@
 
 ## 배포
 GitHub에 push하면 Vercel이 자동 배포합니다. PR 브랜치는 미리보기 주소가 생깁니다.
-
-## 번들 다시 만들기
-`vendor/blob-client.js`는 `@vercel/blob`을 브라우저용으로 묶은 파일입니다. `@vercel/blob` 버전을 올릴 때만 다시 만듭니다.
-```
-npm install
-npx esbuild node_modules/@vercel/blob/dist/client.js --bundle --format=esm --platform=browser --minify --target=es2019 --outfile=vendor/blob-client.js
-```

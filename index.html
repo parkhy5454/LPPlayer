@@ -436,7 +436,6 @@
 
   <audio id="audio" preload="metadata" playsinline></audio>
   <!-- direct-to-Blob upload client, bundled from @vercel/blob (see README) -->
-  <script type="module">window.lpUploadReady = import('./vendor/blob-client.js').then((m) => m.upload);</script>
 
   <script>
   (() => {
@@ -783,39 +782,37 @@
     }
     async function uploadOne(file, onPct) {
       if (file.size > MAX_UPLOAD) throw new Error(T('tooBig'));
-      const upload = await window.lpUploadReady;   // bundled @vercel/blob client
       // unique prefix: Blob is called with addRandomSuffix:false, so equal names would overwrite
       const safe = file.name.replace(/[^A-Za-z0-9._-]/g, '_').slice(-120);
       const pathname = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`;
-      // the browser sends the file straight to Blob; the server only issues a token after the password check
-      const uploadOpts = {
-        access: 'public',
-        handleUploadUrl: '/api/blob-token',
-        clientPayload: JSON.stringify({ token: getToken() }),
-        multipart: file.size > 50 * 1024 * 1024,   // split only big files
-        contentType: mimeFor(file),
-        onUploadProgress: (e) => onPct && onPct(Math.round(e.percentage))
-      };
-      let blob;
+      const clientPayload = JSON.stringify({ token: getToken() });
+      // 1) our server checks the signed-in account and issues a short-lived upload token
+      const tokRes = await fetch('/api/blob-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'blob.generate-client-token', payload: { pathname, callbackUrl: location.origin + '/api/blob-token', multipart: false, clientPayload } })
+      });
+      const tok = await tokRes.json().catch(() => ({}));
+      if (!tokRes.ok || !tok.clientToken) throw new Error(`[token ${tokRes.status}] ${tok.error || ''}`.trim());
+      // 2) the browser sends the file straight to Blob; a 3-minute limit stops a stalled transfer
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 180000);
+      let putRes, putText;
       try {
-        // give the file transfer 3 minutes; without a limit a stalled transfer waits forever
-        blob = await Promise.race([
-          upload(pathname, file, uploadOpts),
-          new Promise((_, reject) => setTimeout(() => reject(new Error(T('timeout'))), 180000))
-        ]);
+        putRes = await fetch(`https://blob.vercel-storage.com/${encodeURI(pathname)}`, {
+          method: 'PUT',
+          headers: { authorization: `Bearer ${tok.clientToken}`, 'x-api-version': '7', 'x-content-type': mimeFor(file), 'x-add-random-suffix': '0' },
+          body: file,
+          signal: ac.signal
+        });
+        putText = await putRes.text();
       } catch (err) {
-        // the SDK hides the server's reason; ask the token route directly to show it
-        if (String(err.message).includes('client token')) {
-          const probe = await fetch('/api/blob-token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'blob.generate-client-token', payload: { pathname: 'probe.mp3', callbackUrl: location.origin + '/api/blob-token', multipart: false, clientPayload: uploadOpts.clientPayload } })
-          });
-          const why = await probe.json().catch(() => ({}));
-          throw new Error(why.diagnostics ? `${why.error} ${JSON.stringify(why.diagnostics)}` : (why.error || `HTTP ${probe.status}`));
-        }
-        throw err;
-      }
+        if (err.name === 'AbortError') throw new Error(T('timeout'));
+        throw new Error(`[network] ${err.message}`);
+      } finally { clearTimeout(timer); }
+      // on failure show Blob's own status and reply so the cause is visible on screen
+      if (!putRes.ok) throw new Error(`[blob ${putRes.status}] ${putText.slice(0, 300)}`);
+      const blob = JSON.parse(putText);
 
       const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 80) || 'Untitled';
       if (onPct) onPct(T('saving'));
