@@ -456,7 +456,7 @@
         prev: '이전', next: '다음', play: '재생', pause: '일시정지', delete: '삭제',
         delConfirm: '이 곡을 목록에서 삭제할까요?',
         pickFiles: '파일 선택 (여러 개 가능)',
-        uploading: '업로드 중…', done: '완료', badType: '오디오 파일이 아닙니다',
+        uploading: '업로드 중…', saving: '저장 중…', timeout: '응답이 없습니다 (시간 초과)', done: '완료', badType: '오디오 파일이 아닙니다',
         uploadProgress: (n, t) => `${n} / ${t} 업로드 중`,
         uploadOk: (n) => `${n}곡 업로드 완료`,
         uploadFail: '업로드 실패',
@@ -479,7 +479,7 @@
         prev: 'Previous', next: 'Next', play: 'Play', pause: 'Pause', delete: 'Delete',
         delConfirm: 'Remove this track from the library?',
         pickFiles: 'Choose files (multiple allowed)',
-        uploading: 'Uploading…', done: 'Done', badType: 'Not an audio file',
+        uploading: 'Uploading…', saving: 'Saving…', timeout: 'No response (timed out)', done: 'Done', badType: 'Not an audio file',
         uploadProgress: (n, t) => `Uploading ${n} / ${t}`,
         uploadOk: (n) => `${n} track(s) uploaded`,
         uploadFail: 'Upload failed',
@@ -547,7 +547,16 @@
       const headers = { ...(opts.headers || {}) };
       const token = getToken();
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      const r = await fetch(path, { ...opts, headers });
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 30000);
+      let r;
+      try {
+        r = await fetch(path, { ...opts, headers, signal: ctl.signal });
+      } catch (e) {
+        throw new Error(e.name === 'AbortError' ? T('timeout') : e.message);
+      } finally {
+        clearTimeout(timer);
+      }
       const data = await r.json().catch(() => ({}));
       if (r.status === 401) {
         endSession(T('sessionEnded'));
@@ -805,6 +814,7 @@
       }
 
       const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 80) || 'Untitled';
+      if (onPct) onPct(T('saving'));
       await api('/api/songs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -833,7 +843,7 @@
         const row = logRow(f.name);
         $('#pickBtn').textContent = T('uploadProgress', i + 1, valid.length);
         try {
-          await uploadOne(f, (pct) => row.set('', `${pct}%`));
+          await uploadOne(f, (v) => row.set('', typeof v === 'number' ? `${v}%` : v));
           okCount++;
           row.set('ok', T('done'));
         } catch (e) {
