@@ -13,7 +13,17 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'POST only' });
   }
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return res.status(500).json({ error: 'BLOB_READ_WRITE_TOKEN is not set' });
+    // diagnostics only: names and yes/no, never values
+    return res.status(500).json({
+      error: 'BLOB_READ_WRITE_TOKEN is not set',
+      diagnostics: {
+        commit: (process.env.VERCEL_GIT_COMMIT_SHA || 'unknown').slice(0, 7),
+        environment: process.env.VERCEL_ENV || 'unknown',
+        JWT_SECRET: Boolean(process.env.JWT_SECRET),
+        DATABASE_URL: Boolean(process.env.DATABASE_URL),
+        blobVariableNamesSeen: Object.keys(process.env).filter((k) => k.includes('BLOB')),
+      },
+    });
   }
   try {
     // Vercel usually parses the JSON body already; read the stream if it did not
