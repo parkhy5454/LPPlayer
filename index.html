@@ -126,6 +126,41 @@
     @media (prefers-reduced-motion: reduce) { .vinyl.spin { animation: none; } }
     .np-big { font-size: 20px; font-weight: 700; margin: 0 0 4px; overflow-wrap: anywhere; }
     .np-sub { color: var(--muted); margin: 0; }
+    .lyrics { min-height: 84px; margin: 8px 8px 0; text-align: center; }
+    .lyrics[hidden] { display: none; }
+    .lyrics p { margin: 2px 0; line-height: 1.35; color: var(--muted); font-size: 16px; overflow-wrap: anywhere; }
+    .lyrics .cur { color: var(--accent); font-size: 19px; font-weight: 700; }
+    /* short phones: smaller disc so the three lyric lines fit above the player */
+    @media (max-height: 760px) {
+      .vinyl { width: min(46vw, 200px); height: min(46vw, 200px); margin-bottom: 8px; }
+    }
+    .chips { display: flex; gap: 8px; overflow-x: auto; padding: 0 0 12px; scrollbar-width: none; }
+    .chips[hidden] { display: none; }
+    .chips::-webkit-scrollbar { display: none; }
+    .chip { flex: none; min-height: var(--tap); padding: 0 16px; border-radius: 999px; border: 1px solid var(--muted); background: transparent; color: inherit; font-size: 16px; }
+    .year-row { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; }
+    .year-row input[type="range"] { flex: 1; accent-color: var(--accent); min-height: var(--tap); }
+    .year-val { min-width: 4em; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .row-btn { flex: none; min-width: var(--tap); min-height: var(--tap); border: 0; background: transparent; color: var(--accent); font-size: 15px; font-weight: 700; }
+    .room-move { min-width: var(--tap); min-height: var(--tap); border: 1px solid var(--muted); border-radius: 10px; background: transparent; }
+    .chip.on { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
+    .room-code { font-size: 44px; font-weight: 800; letter-spacing: .12em; text-align: center; margin: 4px 0 12px; }
+    .lydlg { width: min(92vw, 380px); border: 0; border-radius: 16px; padding: 18px; background: var(--surface); color: inherit; }
+    .lydlg::backdrop { background: rgba(0, 0, 0, .6); }
+    .lydlg h3 { margin: 0 0 4px; }
+    .lydlg .hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+    .lydlg .dlg-btns { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 14px; }
+    .avatars { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 12px; }
+    .avatar { width: var(--tap); height: var(--tap); border-radius: 50%; background: var(--accent); color: #000; display: grid; place-items: center; font-weight: 800; }
+    .reacts { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; }
+    .react-btn { min-width: var(--tap); min-height: var(--tap); border-radius: 50%; border: 1px solid var(--muted); background: transparent; font-size: 22px; }
+    #roomPanel .btn { margin-top: 10px; }
+    .float-layer { position: fixed; left: 0; right: 0; bottom: 200px; height: 0; pointer-events: none; }
+    .float-emoji { position: absolute; bottom: 0; font-size: 34px; animation: floatUp 1.5s ease-out forwards; }
+    @keyframes floatUp { to { transform: translateY(-180px); opacity: 0; } }
+    .field { display: block; width: 100%; box-sizing: border-box; min-height: var(--tap); margin: 10px 0 0; padding: 0 14px; border-radius: 12px; border: 1px solid var(--muted); background: transparent; color: inherit; font-size: 16px; }
+    body.privacy .t, body.privacy .a, body.privacy .np-title, body.privacy .np-artist,
+    body.privacy .np-big, body.privacy .np-sub, body.privacy .lyrics { filter: blur(6px); user-select: none; }
 
     /* ---------- player bar (one-hand zone) ---------- */
     .player {
@@ -186,7 +221,7 @@
     .tabbar {
       flex: none;
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       background: var(--bg);
       padding-bottom: var(--safe-b);
       border-top: 1px solid var(--border);
@@ -194,7 +229,7 @@
     .tab {
       min-height: 60px; border: 0; background: transparent; color: var(--muted);
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-      font-size: 16px; padding: 6px 0;
+      font-size: 14px; padding: 6px 0; white-space: nowrap; min-width: 0;
       transition: transform .08s ease;
     }
     .tab.on { color: var(--accent); }
@@ -329,23 +364,77 @@
           <div class="vinyl paused" id="vinyl"><div class="label">LP</div></div>
           <p class="np-big" id="bigTitle">—</p>
           <p class="np-sub" id="bigArtist"></p>
+          <div class="lyrics" id="lyrics" hidden>
+            <p id="lyPrev"></p>
+            <p class="cur" id="lyCur"></p>
+            <p id="lyNext"></p>
+          </div>
         </div>
       </section>
 
       <!-- LIBRARY -->
       <section class="view" id="view-library" aria-label="library">
+        <input class="field" id="searchInput" type="search" data-i18n-ph="searchPh" placeholder="검색 (제목, 아티스트)">
+        <div class="chips" id="yearChips" hidden></div>
+        <div class="year-row">
+          <input type="range" id="yearSlider" min="1970" max="2025" step="1" value="2000" aria-label="year">
+          <span class="year-val" id="yearVal">2000</span>
+        </div>
         <div class="list" id="list"></div>
+        <input class="sr-only" id="lrcInput" type="file" accept=".lrc,text/plain">
+        <dialog class="lydlg" id="lyDlg">
+          <form id="lyForm">
+            <h3 data-i18n="findLyricsTitle">가사 찾기</h3>
+            <input class="field" id="lyTitle" type="text" maxlength="200" data-i18n-ph="titlePh" placeholder="제목">
+            <input class="field" id="lyArtist" type="text" maxlength="200" data-i18n-ph="artistPh" placeholder="아티스트 (선택)">
+            <p class="hint" data-i18n="findLyricsHint">고친 제목과 가수로 다시 찾을 수 있어요</p>
+            <div class="dlg-btns">
+              <button class="row-btn" id="lyCancel" type="button" data-i18n="lyCancel">취소</button>
+              <button class="btn" type="submit" data-i18n="findLyrics">찾기</button>
+            </div>
+          </form>
+        </dialog>
       </section>
 
       <!-- UPLOAD -->
       <section class="view" id="view-upload" aria-label="upload">
         <div class="card">
           <h2 data-i18n="uploadTitle">파일 업로드</h2>
+          <input class="field" id="titleInput" type="text" maxlength="80"
+                 data-i18n-ph="titlePh" placeholder="제목 (선택, 한 곡일 때)">
+          <input class="field" id="artistInput" type="text" maxlength="80"
+                 data-i18n-ph="artistPh" placeholder="아티스트 (선택)">
+          <input class="field" id="yearInput" type="number" inputmode="numeric" min="1900" max="2100"
+                 data-i18n-ph="yearPh" placeholder="연도 (선택)">
           <button class="btn" id="pickBtn" type="button" data-i18n="pickFiles">파일 선택 (여러 개 가능)</button>
           <input class="sr-only" id="fileInput" type="file" multiple
-                 accept="audio/*,video/*,.mp3,.m4a,.wav,.flac,.aac,.ogg,.opus,.mp4">
+                 accept="audio/*,video/*,.mp3,.m4a,.wav,.flac,.aac,.ogg,.opus,.mp4,.lrc">
           <ul class="log" id="uploadLog"></ul>
         </div>
+      </section>
+
+      <!-- TOGETHER: one host controls playback, members follow -->
+      <section class="view" id="view-together" aria-label="together">
+        <div class="card" id="roomEntry">
+          <button class="btn" id="makeRoomBtn" type="button" data-i18n="makeRoom">방 만들기</button>
+          <input class="field" id="joinCode" type="text" inputmode="numeric" maxlength="6" autocomplete="off"
+                 data-i18n-ph="codePh" placeholder="6자리 코드">
+          <button class="btn btn-secondary" id="joinBtn" type="button" data-i18n="join">참가</button>
+        </div>
+        <div class="card" id="roomPanel" hidden>
+          <p class="room-code" id="roomCode"></p>
+          <div class="avatars" id="members"></div>
+          <div class="reacts" id="reacts"></div>
+          <button class="btn btn-secondary" id="shareBtn" type="button" data-i18n="share">코드 공유</button>
+          <div id="hostBox" hidden>
+            <h2 data-i18n="queueTitle">내 곡</h2>
+            <div class="list" id="hostSongs"></div>
+          </div>
+          <h2 data-i18n="queueNext">다음 곡</h2>
+          <ul class="log" id="roomQueue"></ul>
+          <button class="btn btn-secondary" id="leaveBtn" type="button" data-i18n="leaveRoom">방 나가기</button>
+        </div>
+        <div class="float-layer" id="floatLayer"></div>
       </section>
 
       <!-- SETTINGS -->
@@ -361,6 +450,10 @@
           <h2 data-i18n="account">계정</h2>
           <p class="account-email" id="accountEmail"></p>
           <button class="btn btn-secondary" id="logoutBtn" type="button" data-i18n="logout">로그아웃</button>
+        </div>
+        <div class="card">
+          <h2 data-i18n="privacyTitle">개인정보 보호 모드</h2>
+          <button class="btn btn-secondary" id="privacyBtn" type="button"></button>
         </div>
         <div class="card">
           <h2 data-i18n="install">홈 화면에 설치</h2>
@@ -413,6 +506,10 @@
         <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
         <span data-i18n="tabUpload">업로드</span>
       </button>
+      <button class="tab" type="button" data-view="together" aria-current="false">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5M14.5 15.2c2.6.1 5.5 1.6 5.5 4.8"/></svg>
+        <span data-i18n="tabTogether">함께</span>
+      </button>
       <button class="tab" type="button" data-view="settings" aria-current="false">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
         <span data-i18n="tabSettings">설정</span>
@@ -448,7 +545,7 @@
     /* ---------------- i18n ---------------- */
     const I18N = {
       ko: {
-        tabHome: '홈', tabLib: '보관함', tabUpload: '업로드', tabSettings: '설정',
+        tabHome: '홈', tabLib: '보관함', tabUpload: '업로드', tabSettings: '내 정보', searchPh: '검색 (제목, 아티스트)',
         uploadTitle: '파일 업로드',
         tabLogin: '로그인', tabSignup: '회원가입', emailPh: '이메일', passwordPh: '비밀번호 (8자 이상)',
         account: '계정', logout: '로그아웃', sessionEnded: '다시 로그인해 주세요',
@@ -461,17 +558,27 @@
         pickFiles: '파일 선택 (여러 개 가능)',
         uploading: '업로드 중…', saving: '저장 중…', timeout: '응답이 없습니다 (시간 초과)', done: '완료', badType: '오디오 파일이 아닙니다',
         uploadProgress: (n, t) => `${n} / ${t} 업로드 중`,
-        uploadOk: (n) => `${n}곡 업로드 완료`,
+        uploadOk: (n) => `${n}곡 업로드 되었습니다 - 영구 저장됨`,
+        titlePh: '제목 (선택, 한 곡일 때)', artistPh: '아티스트 (선택)',
         uploadFail: '업로드 실패',
         language: '언어', install: '홈 화면에 설치', installBtn: '설치',
         installed: '이미 설치되어 있습니다',
         iosHint: 'Safari 하단의 공유 버튼 → "홈 화면에 추가"를 누르세요.',
         rotate: '세로 모드로 돌려주세요',
         playFail: '재생할 수 없는 파일입니다',
-        tooBig: '500MB를 넘는 파일입니다'
+        tooBig: '500MB를 넘는 파일입니다',
+        yearPh: '연도 (선택)', yearAll: '전체', privacyTitle: '개인정보 보호 모드', privacyOn: '켜짐', privacyOff: '꺼짐',
+        tabTogether: '함께', makeRoom: '방 만들기', join: '참가', codePh: '6자리 코드', codeBad: '6자리 숫자 코드를 입력하세요',
+        share: '코드 공유', copied: '코드를 복사했습니다', shareText: 'LPPlayer 함께 듣기 코드', leaveRoom: '방 나가기',
+        roomEnded: '방이 종료되었습니다', hostOnly: '방장만 조작할 수 있습니다', queueAdd: '다음 곡에 추가',
+        queueTitle: '내 곡', queueNext: '다음 곡', tapToPlay: '화면을 눌러 재생을 시작하세요',
+        lyricsBtn: '가사', addLyrics: '가사 추가', lyricsSaved: '가사를 저장했습니다',
+        findLyrics: '찾기', findLyricsTitle: '가사 찾기', findLyricsHint: '고친 제목과 가수로 다시 찾을 수 있어요',
+        lyCancel: '취소', lyricsFound: '가사를 찾았습니다', lyricsNone: '이 곡의 가사를 찾지 못했습니다',
+        lyricsHave: '이미 가사가 있습니다'
       },
       en: {
-        tabHome: 'Home', tabLib: 'Library', tabUpload: 'Upload', tabSettings: 'Settings',
+        tabHome: 'Home', tabLib: 'Library', tabUpload: 'Upload', tabSettings: 'Me', searchPh: 'Search (title, artist)',
         uploadTitle: 'Upload files',
         tabLogin: 'Log in', tabSignup: 'Sign up', emailPh: 'Email', passwordPh: 'Password (8+ characters)',
         account: 'Account', logout: 'Log out', sessionEnded: 'Please log in again',
@@ -484,14 +591,24 @@
         pickFiles: 'Choose files (multiple allowed)',
         uploading: 'Uploading…', saving: 'Saving…', timeout: 'No response (timed out)', done: 'Done', badType: 'Not an audio file',
         uploadProgress: (n, t) => `Uploading ${n} / ${t}`,
-        uploadOk: (n) => `${n} track(s) uploaded`,
+        uploadOk: (n) => `${n} track(s) uploaded - saved permanently`,
+        titlePh: 'Title (optional, single track)', artistPh: 'Artist (optional)',
         uploadFail: 'Upload failed',
         language: 'Language', install: 'Add to Home Screen', installBtn: 'Install',
         installed: 'Already installed',
         iosHint: 'Tap the Share button in Safari, then "Add to Home Screen".',
         rotate: 'Please rotate to portrait',
         playFail: 'This file cannot be played',
-        tooBig: 'File is larger than 500 MB'
+        tooBig: 'File is larger than 500 MB',
+        yearPh: 'Year (optional)', yearAll: 'All', privacyTitle: 'Privacy mode', privacyOn: 'On', privacyOff: 'Off',
+        tabTogether: 'Together', makeRoom: 'Create room', join: 'Join', codePh: '6-digit code', codeBad: 'Enter the 6-digit number code',
+        share: 'Share code', copied: 'Code copied', shareText: 'Listen together on LPPlayer, code', leaveRoom: 'Leave room',
+        roomEnded: 'The room has ended', hostOnly: 'Only the host can control playback', queueAdd: 'Add to next',
+        queueTitle: 'My tracks', queueNext: 'Up next', tapToPlay: 'Tap the screen to start playing',
+        lyricsBtn: 'Lyrics', addLyrics: 'Add lyrics', lyricsSaved: 'Lyrics saved',
+        findLyrics: 'Find', findLyricsTitle: 'Find lyrics', findLyricsHint: 'Fix the title or artist and search again',
+        lyCancel: 'Cancel', lyricsFound: 'Lyrics found', lyricsNone: 'No lyrics found for this song',
+        lyricsHave: 'This song already has lyrics'
       }
     };
 
@@ -596,6 +713,7 @@
     }
 
     function renderLibrary() {
+      renderYearChips();
       const list = $('#list');
       $('#count').textContent = songs.length ? `${songs.length}` : '';
       list.textContent = '';
@@ -604,15 +722,28 @@
         return;
       }
       songs.forEach((s, i) => {
+        if (yearFilter && String(s.year || '') !== yearFilter) return;
+        const q = $('#searchInput').value.trim().toLowerCase();
+        if (q && !`${s.title || ''} ${s.artist || ''}`.toLowerCase().includes(q)) return;
+        const sub = [s.artist || T('artistUnknown'), s.year].filter(Boolean).join(' · ');
         const main = el('button', { class: 'row-main', type: 'button' },
           el('span', { class: 'row-idx' }, i === idx ? '♪' : String(i + 1)),
           el('span', { class: 'meta' },
             el('span', { class: 't' }, s.title || 'Untitled'),
-            el('span', { class: 'a' }, s.artist || T('artistUnknown'))));
+            el('span', { class: 'a' }, sub)));
         main.addEventListener('click', () => playIndex(i));
+        const lyr = el('button', { class: 'row-btn', type: 'button', 'aria-label': T('addLyrics') }, T('lyricsBtn'));
+        lyr.addEventListener('click', () => { pendingLyricsId = s.id; $('#lrcInput').click(); });
         const del = el('button', { class: 'del', type: 'button', 'aria-label': T('delete') }, '✕');
         del.addEventListener('click', () => removeSong(s.id));
-        list.append(el('div', { class: 'row' + (i === idx ? ' playing' : '') }, main, del));
+        const kids = [main];
+        if (!s.lyrics) {
+          const find = el('button', { class: 'row-btn', type: 'button' }, T('findLyrics'));
+          find.addEventListener('click', () => openFind(s));
+          kids.push(find);
+        }
+        kids.push(lyr, del);
+        list.append(el('div', { class: 'row' + (i === idx ? ' playing' : '') }, ...kids));
       });
     }
 
@@ -632,6 +763,7 @@
         audio.removeAttribute('src');
         audio.load();
         idx = -1;
+        setLyrics(null);
       } else if (i < idx) {
         idx--;
       }
@@ -639,12 +771,325 @@
       updatePlayer();
     }
 
+    /* ---------------- lyrics (LRC: [mm:ss.xx] text) ---------------- */
+    let lyLines = [];
+    let lyIdx = -2;
+    function parseLrc(text) {
+      const out = [];
+      if (!text) return out;
+      for (const raw of String(text).split(/\r?\n/)) {
+        const stamps = [...raw.matchAll(/\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g)];
+        if (!stamps.length) continue;
+        const words = raw.replace(/\[[^\]]*\]/g, '').trim();
+        for (const m of stamps) {
+          const frac = m[3] ? Number('0.' + m[3]) : 0;
+          out.push({ t: Number(m[1]) * 60 + Number(m[2]) + frac, text: words });
+        }
+      }
+      return out.sort((a, b) => a.t - b.t);
+    }
+    function setLyrics(s) {
+      lyLines = parseLrc(s && s.lyrics);
+      lyIdx = -2;
+      $('#lyrics').hidden = !lyLines.length;
+      updateLyrics();
+    }
+    function updateLyrics() {
+      if (!lyLines.length) return;
+      const t = audio.currentTime;
+      let i = -1;
+      for (let k = 0; k < lyLines.length && lyLines[k].t <= t; k++) i = k;
+      if (i === lyIdx) return;
+      lyIdx = i;
+      $('#lyPrev').textContent = i > 0 ? lyLines[i - 1].text : '';
+      $('#lyCur').textContent = i >= 0 ? lyLines[i].text : '';
+      $('#lyNext').textContent = i + 1 < lyLines.length ? lyLines[i + 1].text : '';
+    }
+
+    /* ---------------- year filter (Time Capsule) ---------------- */
+    let yearFilter = '';
+    function renderYearChips() {
+      const box = $('#yearChips');
+      const years = [...new Set(songs.map((s) => s.year).filter(Boolean))].sort((a, b) => b - a);
+      box.textContent = '';
+      box.hidden = years.length === 0;
+      for (const y of ['', ...years]) {
+        const b = el('button', { class: 'chip' + (yearFilter === String(y) ? ' on' : ''), type: 'button' },
+          y === '' ? T('yearAll') : String(y));
+        b.addEventListener('click', () => { yearFilter = String(y); renderLibrary(); });
+        box.append(b);
+      }
+    }
+
+    /* ---------------- privacy mode (blurs titles on this device) ---------------- */
+    function applyPrivacy() {
+      const on = store.get('lp_privacy') === '1';
+      document.body.classList.toggle('privacy', on);
+      $('#privacyBtn').textContent = on ? T('privacyOn') : T('privacyOff');
+    }
+    $('#privacyBtn').addEventListener('click', () => {
+      store.set('lp_privacy', store.get('lp_privacy') === '1' ? '0' : '1');
+      applyPrivacy();
+    });
+
+    /* ---------------- together (Mixtape): one host, members follow ---------------- */
+    const REACTIONS_LIST = ['❤️', '🔥', '😭', '👏'];
+    let room = null;          // {code, isHost} while in a room
+    let roomTimer = null;
+    let roomSongId = null;
+    let roomSongInfo = null;  // the room's current track, shown in the player
+    let lastReactionId = 0;
+
+    function roomGuard() {
+      if (room && !room.isHost) { toast(T('hostOnly')); return true; }
+      return false;
+    }
+    async function roomControl(action, extra = {}) {
+      if (!room) return;
+      try {
+        await api('/api/rooms?action=control', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: room.code, action, ...extra })
+        });
+        syncRoom();
+      } catch (e) { toast(e.message); }
+    }
+    function enterRoom(code, isHost) {
+      room = { code, isHost };
+      roomSongId = null;
+      roomSongInfo = null;
+      lastReactionId = 0;
+      $('#roomEntry').hidden = true;
+      $('#roomPanel').hidden = false;
+      $('#roomCode').textContent = code;
+      $('#hostBox').hidden = !isHost;
+      renderHostSongs();
+      clearInterval(roomTimer);
+      roomTimer = setInterval(syncRoom, 2000);
+      syncRoom();
+    }
+    function exitRoom(message) {
+      if (room) {
+        api('/api/rooms?action=leave', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: room.code }) }).catch(() => {});
+      }
+      clearInterval(roomTimer);
+      room = null;
+      roomSongId = null;
+      roomSongInfo = null;
+      $('#roomEntry').hidden = false;
+      $('#roomPanel').hidden = true;
+      audio.pause();
+      updatePlayer();
+      if (message) toast(message);
+    }
+    function renderHostSongs() {
+      const box = $('#hostSongs');
+      box.textContent = '';
+      if (!room || !room.isHost) return;
+      if (!songs.length) { box.append(el('p', { class: 'empty' }, T('noSongs'))); return; }
+      songs.forEach((s) => {
+        const main = el('button', { class: 'row-main', type: 'button', 'aria-label': s.title || '' },
+          el('span', { class: 'meta' },
+            el('span', { class: 't' }, s.title || 'Untitled'),
+            el('span', { class: 'a' }, s.artist || T('artistUnknown'))));
+        main.addEventListener('click', () => roomControl('song', { songId: s.id }));
+        const add = el('button', { class: 'del', type: 'button', 'aria-label': T('queueAdd') }, '+');
+        add.addEventListener('click', () => roomControl('queue', { songId: s.id }));
+        box.append(el('div', { class: 'row' }, main, add));
+      });
+    }
+    function renderRoomPeople(st) {
+      const box = $('#members');
+      box.textContent = '';
+      st.members.forEach((email) => box.append(el('span', { class: 'avatar' }, (email[0] || '?').toUpperCase())));
+    }
+    function renderRoomQueue(queue) {
+      const ul = $('#roomQueue');
+      ul.textContent = '';
+      queue.forEach((q, i) => {
+        const item = el('li', {},
+          el('span', { class: 'n' }, q.title || 'Untitled'),
+          el('span', { class: 's' }, q.artist || ''));
+        if (room && room.isHost) {
+          const up = el('button', { class: 'room-move', type: 'button', 'aria-label': 'up' }, '▲');
+          const down = el('button', { class: 'room-move', type: 'button', 'aria-label': 'down' }, '▼');
+          up.disabled = i === 0;
+          down.disabled = i === queue.length - 1;
+          up.addEventListener('click', () => roomControl('move', { qid: q.qid, dir: -1 }));
+          down.addEventListener('click', () => roomControl('move', { qid: q.qid, dir: 1 }));
+          item.append(up, down);
+        }
+        ul.append(item);
+      });
+    }
+    function showReactions(list) {
+      for (const r of list) {
+        if (r.id <= lastReactionId) continue;
+        lastReactionId = r.id;
+        const f = el('span', { class: 'float-emoji' }, r.emoji);
+        f.style.left = (15 + Math.random() * 70) + '%';
+        $('#floatLayer').append(f);
+        setTimeout(() => f.remove(), 1600);
+      }
+    }
+    async function roomReact(emoji) {
+      if (!room) return;
+      try {
+        await api('/api/rooms?action=react', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: room.code, emoji }) });
+        syncRoom();
+      } catch (e) { toast(e.message); }
+    }
+    // poll the room every 2 s; the audio follows the server clock (updatedAt / serverNow)
+    async function syncRoom() {
+      if (!room) return;
+      let st;
+      try {
+        st = await api(`/api/rooms?action=state&code=${encodeURIComponent(room.code)}`);
+      } catch (e) {
+        if (room && /not found|ended/.test(e.message)) exitRoom(T('roomEnded'));
+        return;
+      }
+      if (!room) return;
+      if (st.isHost !== room.isHost) {
+        room.isHost = st.isHost;
+        $('#hostBox').hidden = !room.isHost;
+        renderHostSongs();
+      }
+      renderRoomPeople(st);
+      renderRoomQueue(st.queue);
+      showReactions(st.reactions);
+      if (!st.song) { roomSongInfo = null; updatePlayer(); return; }
+      if (roomSongId !== st.song.id) {
+        roomSongId = st.song.id;
+        roomSongInfo = st.song;
+        audio.src = st.song.url;
+        setLyrics(st.song);
+        updatePlayer();
+      }
+      if (audio.readyState < 1) return;   // metadata not loaded yet; loadedmetadata triggers another sync
+      const expected = st.position + (st.playing ? Math.max(0, (Date.parse(st.serverNow) - Date.parse(st.updatedAt)) / 1000) : 0);
+      if (st.playing) {
+        if (Math.abs(audio.currentTime - expected) > 1) audio.currentTime = expected;
+        if (audio.paused) playAudio();
+      } else {
+        if (!audio.paused) audio.pause();
+        if (Math.abs(audio.currentTime - st.position) > 0.3) audio.currentTime = st.position;
+      }
+    }
+
+    $('#makeRoomBtn').addEventListener('click', async () => {
+      try {
+        const d = await api('/api/rooms?action=create', { method: 'POST' });
+        enterRoom(d.code, true);
+      } catch (e) { toast(e.message); }
+    });
+    $('#joinBtn').addEventListener('click', async () => {
+      const code = $('#joinCode').value.trim();
+      if (!/^\d{6}$/.test(code)) return toast(T('codeBad'));
+      try {
+        await api('/api/rooms?action=join', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }) });
+        enterRoom(code, false);
+      } catch (e) { toast(e.message); }
+    });
+    $('#leaveBtn').addEventListener('click', () => exitRoom(''));
+    $('#shareBtn').addEventListener('click', async () => {
+      if (!room) return;
+      try {
+        if (navigator.share) await navigator.share({ title: 'LPPlayer', text: `${T('shareText')} ${room.code}` });
+        else { await navigator.clipboard.writeText(room.code); toast(T('copied')); }
+      } catch {}
+    });
+    REACTIONS_LIST.forEach((e) => {
+      const b = el('button', { class: 'react-btn', type: 'button', 'aria-label': e }, e);
+      b.addEventListener('click', () => roomReact(e));
+      $('#reacts').append(b);
+    });
+
+    /* ---------------- add lyrics to a song that was uploaded without them ---------------- */
+    let pendingLyricsId = null;
+    $('#lrcInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file || !pendingLyricsId) return;
+      const id = pendingLyricsId;
+      pendingLyricsId = null;
+      try {
+        const text = await file.text();
+        await api(`/api/songs?id=${encodeURIComponent(id)}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lyrics: text })
+        });
+        const s = songs.find((x) => x.id === id);
+        if (s) s.lyrics = text;
+        if (idx >= 0 && songs[idx] && songs[idx].id === id) setLyrics(songs[idx]);
+        toast(T('lyricsSaved'));
+      } catch (err) {
+        toast(`${T('uploadFail')}: ${err.message}`);
+      }
+    });
+
+    /* ---------------- automatic lyrics (LRCLIB, looked up on the server) ---------------- */
+    const lyricsTried = new Set();   // songs already tried this session, so a miss is not retried on every play
+    // saves the lyrics on the song only when it has none; a user's own .lrc is never replaced
+    async function fetchLyrics(s, title, artist, duration) {
+      const q = new URLSearchParams({ title, artist, duration: String(Math.round(duration) || 0) });
+      const r = await api(`/api/lyrics?${q}`);
+      if (!r.found) return false;
+      await api(`/api/songs?id=${encodeURIComponent(s.id)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lyrics: r.synced })
+      });
+      s.lyrics = r.synced;
+      return true;
+    }
+    async function autoLyrics(s) {
+      if (!s || s.lyrics || lyricsTried.has(s.id)) return;
+      lyricsTried.add(s.id);
+      try {
+        if (await fetchLyrics(s, s.title || '', s.artist || '', audio.duration) && songs[idx] === s) {
+          setLyrics(s);
+          toast(T('lyricsFound'));
+        }
+      } catch {}   // silent: the user can still search by hand from the library
+    }
+    let findSong = null;
+    function openFind(s) {
+      if (s.lyrics) return toast(T('lyricsHave'));
+      findSong = s;
+      $('#lyTitle').value = s.title || '';
+      $('#lyArtist').value = s.artist || '';
+      $('#lyDlg').showModal();
+    }
+    $('#lyCancel').addEventListener('click', () => $('#lyDlg').close());
+    $('#lyForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const s = findSong;
+      const title = $('#lyTitle').value.trim();
+      $('#lyDlg').close();
+      if (!s || !title) return;
+      try {
+        const current = songs[idx] === s;
+        if (!await fetchLyrics(s, title, $('#lyArtist').value.trim(), current ? audio.duration : 0)) {
+          return toast(T('lyricsNone'));
+        }
+        if (current) setLyrics(s);
+        renderLibrary();
+        toast(T('lyricsSaved'));
+      } catch (err) {
+        toast(err.message);
+      }
+    });
+
     /* ---------------- playback ---------------- */
     function playIndex(i) {
       if (!songs.length) return;
       idx = ((i % songs.length) + songs.length) % songs.length;
       const s = songs[idx];
       audio.src = s.url;
+      setLyrics(s);
       playAudio();
       if ('mediaSession' in navigator) {
         try { navigator.mediaSession.metadata = new MediaMetadata({ title: s.title || '', artist: s.artist || '' }); } catch {}
@@ -656,15 +1101,24 @@
       const p = audio.play();
       if (p && p.catch) p.catch((e) => {
         // AbortError = a newer track replaced this one; that is not a failure
-        if (e && e.name !== 'AbortError') toast(T('playFail'));
+        if (e && e.name === 'NotAllowedError' && room) toast(T('tapToPlay'));
+        else if (e && e.name !== 'AbortError') toast(T('playFail'));
       });
     }
     function togglePlay() {
+      if (roomGuard()) return;
+      if (room) return roomControl(audio.paused ? 'play' : 'pause', { position: audio.currentTime });
       if (idx < 0) return playIndex(0);
       if (audio.paused) playAudio(); else audio.pause();
     }
-    function next() { playIndex(idx + 1); }
+    function next() {
+      if (roomGuard()) return;
+      if (room) return roomControl('next');
+      playIndex(idx + 1);
+    }
     function prev() {
+      if (roomGuard()) return;
+      if (room) return roomControl('seek', { position: 0 });
       if (audio.currentTime > 3) { audio.currentTime = 0; return; }   // like real players
       playIndex(idx - 1);
     }
@@ -673,7 +1127,7 @@
     const PAUSE_SVG = '<rect x="6" y="5" width="4.2" height="14" rx="1"/><rect x="13.8" y="5" width="4.2" height="14" rx="1"/>';
 
     function updatePlayer() {
-      const s = songs[idx];
+      const s = room ? roomSongInfo : songs[idx];
       const title = s ? (s.title || 'Untitled') : T('nothing');
       const artist = s ? (s.artist || T('artistUnknown')) : '';
       $('#npTitle').textContent = title;
@@ -687,24 +1141,53 @@
       $('#vinyl').classList.toggle('paused', !playing);
       $('#prevBtn').setAttribute('aria-label', T('prev'));
       $('#nextBtn').setAttribute('aria-label', T('next'));
-      $('#prevBtn').disabled = !songs.length;
-      $('#nextBtn').disabled = !songs.length;
+      $('#prevBtn').disabled = !room && !songs.length;
+      $('#nextBtn').disabled = !room && !songs.length;
     }
 
-    audio.addEventListener('play', updatePlayer);
+    // needle drop: a short synthesized crackle when a record starts from the beginning
+    let needleCtx = null;
+    function needleDrop() {
+      try {
+        needleCtx = needleCtx || new (window.AudioContext || window.webkitAudioContext)();
+        const sr = needleCtx.sampleRate;
+        const buf = needleCtx.createBuffer(1, Math.floor(sr * 0.25), sr);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (sr * 0.04)) * 0.25;
+        const src = needleCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(needleCtx.destination);
+        src.start();
+      } catch {}
+    }
+    audio.addEventListener('play', () => {
+      if (audio.currentTime < 0.6) needleDrop();
+      updatePlayer();
+    });
     audio.addEventListener('pause', updatePlayer);
-    audio.addEventListener('ended', next);
+    audio.addEventListener('ended', () => {
+      if (room) { if (room.isHost) roomControl('next'); return; }   // in a room only the host advances
+      next();
+    });
     audio.addEventListener('loadedmetadata', () => {
       $('#tDur').textContent = fmt(audio.duration);
+      if (room) syncRoom();
+      else if (idx >= 0) autoLyrics(songs[idx]);   // the length is known now, which makes the match exact
     });
     audio.addEventListener('timeupdate', () => {
       $('#tCur').textContent = fmt(audio.currentTime);
+      updateLyrics();
       if (audio.duration) $('#seek').value = Math.round((audio.currentTime / audio.duration) * 1000);
     });
     audio.addEventListener('error', () => { if (idx >= 0 && audio.error && audio.error.code !== 1) toast(T('playFail')); });
 
     $('#seek').addEventListener('input', (e) => {
-      if (audio.duration) audio.currentTime = (e.target.value / 1000) * audio.duration;
+      if (room || !audio.duration) return;   // in a room the slider only sends on release
+      audio.currentTime = (e.target.value / 1000) * audio.duration;
+    });
+    $('#seek').addEventListener('change', (e) => {
+      if (!room || !audio.duration || roomGuard()) return;
+      roomControl('seek', { position: (e.target.value / 1000) * audio.duration });
     });
     $('#playBtn').addEventListener('click', togglePlay);
     $('#nextBtn').addEventListener('click', next);
@@ -749,6 +1232,7 @@
         b.setAttribute('aria-current', on ? 'page' : 'false');
       });
       $('#main').scrollTop = 0;
+      if (name === 'together') renderHostSongs();
     }
     document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
 
@@ -784,7 +1268,7 @@
       const ext = (file.name.split('.').pop() || '').toLowerCase();
       return MIME_BY_EXT[ext] || 'application/octet-stream';
     }
-    async function uploadOne(file, onPct) {
+    async function uploadOne(file, onPct, meta = {}) {
       if (file.size > MAX_UPLOAD) throw new Error(T('tooBig'));
       // unique prefix: Blob is called with addRandomSuffix:false, so equal names would overwrite
       const safe = file.name.replace(/[^A-Za-z0-9._-]/g, '_').slice(-120);
@@ -824,13 +1308,15 @@
       if (!putRes.ok) throw new Error(T('uploadFail'));
       const blob = JSON.parse(putText);
 
-      const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 80) || 'Untitled';
+      const fromName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 80);
+      const title = meta.title || fromName || 'Untitled';
       if (onPct) onPct(T('saving'));
-      await api('/api/songs', {
+      const saved = await api('/api/songs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, url: blob.url, size: file.size })
+        body: JSON.stringify({ title, artist: meta.artist || null, url: blob.url, size: file.size, lyrics: meta.lyrics || null, year: meta.year || null })
       });
+      return saved.song;
     }
 
     let busy = false;
@@ -842,19 +1328,33 @@
       $('#pickBtn').disabled = true;
       $('#uploadLog').textContent = '';
 
+      // .lrc files are paired with the audio file that has the same name
+      const baseName = (n) => n.replace(/\.[^/.]+$/, '').toLowerCase();
+      const lrcs = new Map();
       const valid = [];
       for (const f of files) {
-        if (isAudio(f)) valid.push(f);
+        if (/\.lrc$/i.test(f.name)) lrcs.set(baseName(f.name), f);
+        else if (isAudio(f)) valid.push(f);
         else logRow(f.name).set('err', T('badType'));
       }
+      const yearVal = parseInt($('#yearInput').value, 10);
+      const year = yearVal >= 1900 && yearVal <= 2100 ? yearVal : null;
+      const artist = $('#artistInput').value.trim() || null;
+      // a typed title only makes sense for a single file; several files keep their own names
+      const titleOne = valid.length === 1 ? $('#titleInput').value.trim() || null : null;
 
       let okCount = 0;
+      let firstId = null;
       for (let i = 0; i < valid.length; i++) {
         const f = valid[i];
         const row = logRow(f.name);
         $('#pickBtn').textContent = T('uploadProgress', i + 1, valid.length);
         try {
-          await uploadOne(f, (v) => row.set('', typeof v === 'number' ? `${v}%` : v));
+          const lrc = lrcs.get(baseName(f.name));
+          const lyrics = lrc ? await lrc.text() : null;
+          const song = await uploadOne(f, (v) => row.set('', typeof v === 'number' ? `${v}%` : v),
+            { lyrics, year, artist, title: titleOne });
+          if (!firstId && song) firstId = song.id;
           okCount++;
           row.set('ok', T('done'));
         } catch (e) {
@@ -864,13 +1364,30 @@
       }
 
       $('#fileInput').value = '';
+      $('#titleInput').value = '';
+      $('#artistInput').value = '';
       $('#pickBtn').textContent = T('pickFiles');
       $('#pickBtn').disabled = false;
       busy = false;
       await loadSongs();
-      if (okCount) toast(T('uploadOk', okCount));
+      if (okCount) {
+        toast(T('uploadOk', okCount));
+        // success: close the upload page, go home and start the first new track
+        setTimeout(() => {
+          showView('home');
+          const at = songs.findIndex((s) => s.id === firstId);
+          if (at >= 0) playIndex(at);
+        }, 1200);
+      }
     }
 
+    $('#searchInput').addEventListener('input', () => renderLibrary());
+    // year slider: pick one year to show only that year's tracks
+    $('#yearSlider').addEventListener('input', (e) => {
+      yearFilter = e.target.value;
+      $('#yearVal').textContent = e.target.value;
+      renderLibrary();
+    });
     $('#pickBtn').addEventListener('click', () => $('#fileInput').click());
     $('#fileInput').addEventListener('change', (e) => handleFiles(e.target.files));
 
@@ -891,6 +1408,7 @@
       lang = b.dataset.lang;
       store.set('lp_lang', lang);
       applyLang();
+      applyPrivacy();
     }));
 
     let deferredPrompt = null;
@@ -970,6 +1488,7 @@
     $('#logoutBtn').addEventListener('click', () => endSession(''));
 
     applyLang();
+    applyPrivacy();
     renderAccount();
     if (getToken()) loadSongs(); else showAuth('');
   })();
