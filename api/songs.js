@@ -1,9 +1,21 @@
 import { neon } from '@neondatabase/serverless';
 import { del } from '@vercel/blob';
+import { keyIsValid, keyFromRequest } from '../lib/auth.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// only links to files in our own Blob store may be saved
+function isOurBlobUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' && u.hostname.endsWith('.public.blob.vercel-storage.com');
+  } catch { return false; }
+}
+
 export default async function handler(req, res) {
+  if (!keyIsValid(keyFromRequest(req))) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
   if (!process.env.DATABASE_URL) {
     return res.status(500).json({ error: 'DATABASE_URL is not set (Vercel > Settings > Environment Variables)' });
   }
@@ -28,7 +40,9 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
       const { title, artist, url, size } = body;
-      if (!url || typeof url !== 'string') return res.status(400).json({ error: 'url is required' });
+      if (!url || typeof url !== 'string' || !isOurBlobUrl(url)) {
+        return res.status(400).json({ error: 'a valid uploaded file url is required' });
+      }
       const rows = await sql`INSERT INTO songs (title, artist, url, size)
                              VALUES (${title || 'Untitled'}, ${artist || null}, ${url}, ${Number(size) || 0})
                              RETURNING id, title, artist, url, size, created_at`;

@@ -250,6 +250,23 @@
     }
     .lang-btn[aria-pressed="true"] { background: var(--accent); color: #000; }
 
+    /* ---------- password gate ---------- */
+    .lock {
+      position: fixed; inset: 0; z-index: 50;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      padding: calc(var(--safe-t) + 24px) 24px calc(var(--safe-b) + 24px);
+    }
+    .lock-card { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+    .lock-card h2 { margin: 0; font-size: 26px; }
+    .lock-card p { margin: 0; color: var(--muted); }
+    .lock-card input {
+      min-height: 56px; font-size: 16px; border-radius: 14px; padding: 0 16px;
+      border: 1px solid var(--border); background: var(--surface); color: var(--fg);
+      user-select: text; -webkit-user-select: text;
+    }
+    .lock-card .err { color: var(--accent-2); }
+
     /* ---------- toast ---------- */
     .toast {
       position: absolute; left: 16px; right: 16px;
@@ -391,7 +408,20 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
 
+  <div class="lock" id="lock" hidden>
+    <form class="lock-card" id="lockForm" autocomplete="on">
+      <h2>LPPlayer</h2>
+      <p data-i18n="lockHint">비밀번호를 입력하세요</p>
+      <input type="password" id="lockInput" name="password" autocomplete="current-password"
+             autocapitalize="off" autocorrect="off" spellcheck="false" required>
+      <p class="err" id="lockErr" hidden data-i18n="wrongKey">비밀번호가 맞지 않습니다</p>
+      <button class="btn" type="submit" data-i18n="enter">들어가기</button>
+    </form>
+  </div>
+
   <audio id="audio" preload="metadata" playsinline></audio>
+  <!-- direct-to-Blob upload client, bundled from @vercel/blob (see README) -->
+  <script type="module">window.lpUploadReady = import('./vendor/blob-client.js').then((m) => m.upload);</script>
 
   <script>
   (() => {
@@ -420,7 +450,11 @@
         iosHint: 'Safari 하단의 공유 버튼 → "홈 화면에 추가"를 누르세요.',
         rotate: '세로 모드로 돌려주세요',
         playFail: '재생할 수 없는 파일입니다',
-        loadErr: '불러오기 오류'
+        loadErr: '불러오기 오류',
+        lockHint: '비밀번호를 입력하세요',
+        wrongKey: '비밀번호가 맞지 않습니다',
+        enter: '들어가기',
+        tooBig: '500MB를 넘는 파일입니다'
       },
       en: {
         tabHome: 'Home', tabLib: 'Library', tabUpload: 'Upload', tabSettings: 'Settings',
@@ -443,7 +477,11 @@
         iosHint: 'Tap the Share button in Safari, then "Add to Home Screen".',
         rotate: 'Please rotate to portrait',
         playFail: 'This file cannot be played',
-        loadErr: 'Load error'
+        loadErr: 'Load error',
+        lockHint: 'Enter the password',
+        wrongKey: 'Wrong password',
+        enter: 'Enter',
+        tooBig: 'File is larger than 500 MB'
       }
     };
 
@@ -469,9 +507,22 @@
       for (const c of children) n.append(c instanceof Node ? c : document.createTextNode(String(c)));
       return n;
     }
-    async function api(path, opts) {
-      const r = await fetch(path, opts);
+    const KEY_NAME = 'lp_key';
+    const getKey = () => store.get(KEY_NAME) || '';
+    function showLock(wrong) {
+      $('#lockErr').hidden = !wrong;
+      $('#lock').hidden = false;
+      setTimeout(() => $('#lockInput').focus(), 50);
+    }
+    async function api(path, opts = {}) {
+      const headers = { ...(opts.headers || {}), 'x-app-key': getKey() };
+      const r = await fetch(path, { ...opts, headers });
       const data = await r.json().catch(() => ({}));
+      if (r.status === 401) {
+        store.set(KEY_NAME, '');
+        showLock(true);
+        throw new Error('unauthorized');
+      }
       if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
       return data;
     }
@@ -496,7 +547,7 @@
         songs = d.songs || [];
         if (idx >= songs.length) idx = -1;
       } catch (e) {
-        toast(`${T('loadFail')}: ${e.message}`);
+        if (e.message !== 'unauthorized') toast(`${T('loadFail')}: ${e.message}`);
       }
       renderLibrary();
       updatePlayer();
@@ -673,22 +724,28 @@
       };
     }
 
-    async function uploadOne(file) {
-      // unique prefix: Vercel Blob is called with addRandomSuffix:false, so same names would overwrite
-      const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${file.name}`;
-      const up = await fetch(`/api/upload?filename=${encodeURIComponent(unique)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-        body: file
+    const MAX_UPLOAD = 500 * 1024 * 1024;
+    async function uploadOne(file, onPct) {
+      if (file.size > MAX_UPLOAD) throw new Error(T('tooBig'));
+      const upload = await window.lpUploadReady;   // bundled @vercel/blob client
+      // unique prefix: Blob is called with addRandomSuffix:false, so equal names would overwrite
+      const safe = file.name.replace(/[^A-Za-z0-9._-]/g, '_').slice(-120);
+      const pathname = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`;
+      // the browser sends the file straight to Blob; the server only issues a token after the password check
+      const blob = await upload(pathname, file, {
+        access: 'public',
+        handleUploadUrl: '/api/blob-token',
+        clientPayload: JSON.stringify({ key: getKey() }),
+        multipart: file.size > 50 * 1024 * 1024,   // split only big files
+        contentType: file.type || 'application/octet-stream',
+        onUploadProgress: (e) => onPct && onPct(Math.round(e.percentage))
       });
-      const upData = await up.json().catch(() => ({}));
-      if (!up.ok) throw new Error(upData.error || `HTTP ${up.status}`);
 
       const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 80) || 'Untitled';
       await api('/api/songs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, url: upData.url, size: file.size })
+        body: JSON.stringify({ title, url: blob.url, size: file.size })
       });
     }
 
@@ -713,10 +770,11 @@
         const row = logRow(f.name);
         $('#pickBtn').textContent = T('uploadProgress', i + 1, valid.length);
         try {
-          await uploadOne(f);
+          await uploadOne(f, (pct) => row.set('', `${pct}%`));
           okCount++;
           row.set('ok', T('done'));
         } catch (e) {
+          if (e.message === 'unauthorized') { row.set('err', T('wrongKey')); break; }
           row.set('err', `${T('uploadFail')}: ${e.message}`);
         }
       }
@@ -794,8 +852,18 @@
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
+    $('#lockForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const key = $('#lockInput').value.trim();
+      if (!key) return;
+      store.set(KEY_NAME, key);
+      $('#lockInput').value = '';
+      $('#lock').hidden = true;
+      loadSongs();
+    });
+
     applyLang();
-    loadSongs();
+    if (getKey()) loadSongs(); else showLock(false);
   })();
   </script>
 </body>
