@@ -1,6 +1,6 @@
 {
-  "name": "lpplayer-cross-device",
-  "version": "5.0.0",
+  "name": "lpplayer-final-complete",
+  "version": "6.0.0",
   "type": "module",
   "dependencies": {
     "@neondatabase/serverless": "^0.10.0",
