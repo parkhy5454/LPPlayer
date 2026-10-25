@@ -229,9 +229,9 @@
     .card { background: var(--surface); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
     .card h2 { font-size: 18px; margin: 0 0 8px; }
     .log { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-    .log li { display: flex; justify-content: space-between; gap: 12px; font-size: 16px; }
+    .log li { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; font-size: 16px; }
     .log .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-    .log .s { flex: none; color: var(--muted); }
+    .log .s { flex: 0 1 auto; min-width: 0; color: var(--muted); overflow-wrap: anywhere; text-align: right; }
     .log .ok .s { color: var(--accent); }
     .log .err .s { color: var(--accent-2); }
     .sr-only {
