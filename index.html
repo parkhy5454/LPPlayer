@@ -364,6 +364,7 @@
 
       <!-- LIBRARY -->
       <section class="view" id="view-library" aria-label="library">
+        <input class="field" id="searchInput" type="search" data-i18n-ph="searchPh" placeholder="검색 (제목, 아티스트)">
         <div class="chips" id="yearChips" hidden></div>
         <div class="list" id="list"></div>
       </section>
@@ -517,7 +518,7 @@
     /* ---------------- i18n ---------------- */
     const I18N = {
       ko: {
-        tabHome: '홈', tabLib: '보관함', tabUpload: '업로드', tabSettings: '설정',
+        tabHome: '홈', tabLib: '보관함', tabUpload: '업로드', tabSettings: '내 정보', searchPh: '검색 (제목, 아티스트)',
         uploadTitle: '파일 업로드',
         tabLogin: '로그인', tabSignup: '회원가입', emailPh: '이메일', passwordPh: '비밀번호 (8자 이상)',
         account: '계정', logout: '로그아웃', sessionEnded: '다시 로그인해 주세요',
@@ -546,7 +547,7 @@
         queueTitle: '내 곡', queueNext: '다음 곡', tapToPlay: '화면을 눌러 재생을 시작하세요'
       },
       en: {
-        tabHome: 'Home', tabLib: 'Library', tabUpload: 'Upload', tabSettings: 'Settings',
+        tabHome: 'Home', tabLib: 'Library', tabUpload: 'Upload', tabSettings: 'Me', searchPh: 'Search (title, artist)',
         uploadTitle: 'Upload files',
         tabLogin: 'Log in', tabSignup: 'Sign up', emailPh: 'Email', passwordPh: 'Password (8+ characters)',
         account: 'Account', logout: 'Log out', sessionEnded: 'Please log in again',
@@ -687,6 +688,8 @@
       }
       songs.forEach((s, i) => {
         if (yearFilter && String(s.year || '') !== yearFilter) return;
+        const q = $('#searchInput').value.trim().toLowerCase();
+        if (q && !`${s.title || ''} ${s.artist || ''}`.toLowerCase().includes(q)) return;
         const sub = [s.artist || T('artistUnknown'), s.year].filter(Boolean).join(' · ');
         const main = el('button', { class: 'row-main', type: 'button' },
           el('span', { class: 'row-idx' }, i === idx ? '♪' : String(i + 1)),
@@ -1011,7 +1014,25 @@
       $('#nextBtn').disabled = !room && !songs.length;
     }
 
-    audio.addEventListener('play', updatePlayer);
+    // needle drop: a short synthesized crackle when a record starts from the beginning
+    let needleCtx = null;
+    function needleDrop() {
+      try {
+        needleCtx = needleCtx || new (window.AudioContext || window.webkitAudioContext)();
+        const sr = needleCtx.sampleRate;
+        const buf = needleCtx.createBuffer(1, Math.floor(sr * 0.25), sr);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (sr * 0.04)) * 0.25;
+        const src = needleCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(needleCtx.destination);
+        src.start();
+      } catch {}
+    }
+    audio.addEventListener('play', () => {
+      if (audio.currentTime < 0.6) needleDrop();
+      updatePlayer();
+    });
     audio.addEventListener('pause', updatePlayer);
     audio.addEventListener('ended', () => {
       if (room) { if (room.isHost) roomControl('next'); return; }   // in a room only the host advances
@@ -1228,6 +1249,7 @@
       }
     }
 
+    $('#searchInput').addEventListener('input', () => renderLibrary());
     $('#pickBtn').addEventListener('click', () => $('#fileInput').click());
     $('#fileInput').addEventListener('change', (e) => handleFiles(e.target.files));
 
