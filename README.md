@@ -1,23 +1,21 @@
 
-# LPPlayer v6.0 Final Complete
+# LPPlayer v7.0 Mobile Fully Optimized
 
-## 최종 개선
-- 가운데 LP판 300px + 가사 싱크 (큰 카드 그리드 제거)
-- 업로드 시 "업로드 되었습니다" 토스트 + 자동 닫힘 + Home으로 이동 + 새 곡 재생
-- 한글/영어 토글 우상단 (localStorage)
-- 노트북 업로드 → 핸드폰에서도 보임 (Vercel Blob + NeonDB)
-- 하단 고정 5탭: Home Search Library Upload Profile
-- 소리 재생, LP판 회전, 파일 업로드 전부 작동
+## 모바일 최적화 체크리스트
+- 100dvh (주소창 대응) + env(safe-area-inset-top/bottom) 노치 대응
+- 스와이프: LP판 좌/우 스와이프로 이전/다음 곡
+- 한손모드: 72px 재생버튼 하단 중앙 엄지 위치, 44px 터치타겟
+- PWA: manifest 192/512, standalone, apple-touch-icon, black-translucent
+- 터치: scale(0.95) 피드백, vibrate(10) 햅틱, user-select none, overscroll none, tap-highlight transparent
+- 폰트 16px 이상 (iOS 줌 방지)
+- 가운데 LP판 280px 회전 + 가사, 업로드 자동닫힘 "업로드 되었습니다" 토스트, 크로스디바이스
 
 ## Deploy
-1. GitHub lpplayer 레포에 이 파일들 덮어쓰기
-2. Vercel 자동 재배포
-3. lpplayer-hazel.vercel.app 테스트:
-   - 곡 재생 소리 남?
-   - 가운데 LP판 돔?
-   - 업로드 후 "업로드 되었습니다" 뜨고 닫힘?
-   - 노트북 업로드 후 핸드폰에서 보임?
-   - EN/한글 토글 됨?
+GitHub lpplayer 레포에 덮어쓰기 -> Vercel 자동배포 -> 핸드폰에서 lpplayer-hazel.vercel.app 접속 -> 홈화면에 추가
 
-## Env vars (이미 설정됨)
-DATABASE_URL, BLOB_READ_WRITE_TOKEN, JWT_SECRET
+테스트:
+- LP판 스와이프로 곡 넘어감?
+- 하단 재생버튼 엄지로 닿음?
+- 아이폰 노치에 안가려짐?
+- 업로드 후 토스트뜨고 닫힘?
+- 설치 후 앱처럼 실행됨?
