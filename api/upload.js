@@ -18,7 +18,8 @@ export default async function handler(req, res) {
     const buffer = Buffer.concat(chunks);
     console.log('Upload buffer size', buffer.length);
     if (buffer.length === 0) return res.status(400).json({ error: 'Empty file - browser did not send file' });
-    const blob = await put(filename, buffer, { access: 'public', contentType: 'audio/mpeg', addRandomSuffix: false });
+    const contentType = req.headers['content-type'] || 'application/octet-stream';
+    const blob = await put(filename, buffer, { access: 'public', contentType, addRandomSuffix: false });
     console.log('Blob OK', blob.url);
     return res.status(200).json({ url: blob.url, ...blob });
   } catch (e) {
