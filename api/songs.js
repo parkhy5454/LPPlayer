@@ -65,6 +65,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ song: rows[0] });
     }
 
+    if (req.method === 'PATCH') {
+      // add or replace the lyrics of one of the user's own songs
+      const id = String(req.query.id || '');
+      if (!UUID.test(id)) return res.status(400).json({ error: 'valid id is required' });
+      const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+      const lyrics = typeof body.lyrics === 'string' && body.lyrics.trim() ? body.lyrics.slice(0, MAX_LYRICS) : null;
+      const rows = await sql`UPDATE songs SET lyrics = ${lyrics} WHERE id = ${id} AND user_id = ${userId}
+                             RETURNING id, lyrics`;
+      if (!rows.length) return res.status(404).json({ error: 'not found' });
+      return res.status(200).json({ song: rows[0] });
+    }
+
     if (req.method === 'DELETE') {
       const id = String(req.query.id || '');
       if (!UUID.test(id)) return res.status(400).json({ error: 'valid id is required' });
@@ -75,7 +87,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    res.setHeader('Allow', 'GET, POST, DELETE');
+    res.setHeader('Allow', 'GET, POST, PATCH, DELETE');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (e) {
     console.error('songs api error', e);

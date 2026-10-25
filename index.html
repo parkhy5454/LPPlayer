@@ -141,6 +141,7 @@
     .year-row { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; }
     .year-row input[type="range"] { flex: 1; accent-color: var(--accent); min-height: var(--tap); }
     .year-val { min-width: 4em; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .row-btn { flex: none; min-width: var(--tap); min-height: var(--tap); border: 0; background: transparent; color: var(--accent); font-size: 15px; font-weight: 700; }
     .room-move { min-width: var(--tap); min-height: var(--tap); border: 1px solid var(--muted); border-radius: 10px; background: transparent; }
     .chip.on { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
     .room-code { font-size: 44px; font-weight: 800; letter-spacing: .12em; text-align: center; margin: 4px 0 12px; }
@@ -375,6 +376,7 @@
           <span class="year-val" id="yearVal">2000</span>
         </div>
         <div class="list" id="list"></div>
+        <input class="sr-only" id="lrcInput" type="file" accept=".lrc,text/plain">
       </section>
 
       <!-- UPLOAD -->
@@ -552,7 +554,8 @@
         tabTogether: '함께', makeRoom: '방 만들기', join: '참가', codePh: '6자리 코드', codeBad: '6자리 숫자 코드를 입력하세요',
         share: '코드 공유', copied: '코드를 복사했습니다', shareText: 'LPPlayer 함께 듣기 코드', leaveRoom: '방 나가기',
         roomEnded: '방이 종료되었습니다', hostOnly: '방장만 조작할 수 있습니다', queueAdd: '다음 곡에 추가',
-        queueTitle: '내 곡', queueNext: '다음 곡', tapToPlay: '화면을 눌러 재생을 시작하세요'
+        queueTitle: '내 곡', queueNext: '다음 곡', tapToPlay: '화면을 눌러 재생을 시작하세요',
+        lyricsBtn: '가사', addLyrics: '가사 추가', lyricsSaved: '가사를 저장했습니다'
       },
       en: {
         tabHome: 'Home', tabLib: 'Library', tabUpload: 'Upload', tabSettings: 'Me', searchPh: 'Search (title, artist)',
@@ -581,7 +584,8 @@
         tabTogether: 'Together', makeRoom: 'Create room', join: 'Join', codePh: '6-digit code', codeBad: 'Enter the 6-digit number code',
         share: 'Share code', copied: 'Code copied', shareText: 'Listen together on LPPlayer, code', leaveRoom: 'Leave room',
         roomEnded: 'The room has ended', hostOnly: 'Only the host can control playback', queueAdd: 'Add to next',
-        queueTitle: 'My tracks', queueNext: 'Up next', tapToPlay: 'Tap the screen to start playing'
+        queueTitle: 'My tracks', queueNext: 'Up next', tapToPlay: 'Tap the screen to start playing',
+        lyricsBtn: 'Lyrics', addLyrics: 'Add lyrics', lyricsSaved: 'Lyrics saved'
       }
     };
 
@@ -705,9 +709,11 @@
             el('span', { class: 't' }, s.title || 'Untitled'),
             el('span', { class: 'a' }, sub)));
         main.addEventListener('click', () => playIndex(i));
+        const lyr = el('button', { class: 'row-btn', type: 'button', 'aria-label': T('addLyrics') }, T('lyricsBtn'));
+        lyr.addEventListener('click', () => { pendingLyricsId = s.id; $('#lrcInput').click(); });
         const del = el('button', { class: 'del', type: 'button', 'aria-label': T('delete') }, '✕');
         del.addEventListener('click', () => removeSong(s.id));
-        list.append(el('div', { class: 'row' + (i === idx ? ' playing' : '') }, main, del));
+        list.append(el('div', { class: 'row' + (i === idx ? ' playing' : '') }, main, lyr, del));
       });
     }
 
@@ -970,6 +976,29 @@
       const b = el('button', { class: 'react-btn', type: 'button', 'aria-label': e }, e);
       b.addEventListener('click', () => roomReact(e));
       $('#reacts').append(b);
+    });
+
+    /* ---------------- add lyrics to a song that was uploaded without them ---------------- */
+    let pendingLyricsId = null;
+    $('#lrcInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file || !pendingLyricsId) return;
+      const id = pendingLyricsId;
+      pendingLyricsId = null;
+      try {
+        const text = await file.text();
+        await api(`/api/songs?id=${encodeURIComponent(id)}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lyrics: text })
+        });
+        const s = songs.find((x) => x.id === id);
+        if (s) s.lyrics = text;
+        if (idx >= 0 && songs[idx] && songs[idx].id === id) setLyrics(songs[idx]);
+        toast(T('lyricsSaved'));
+      } catch (err) {
+        toast(`${T('uploadFail')}: ${err.message}`);
+      }
     });
 
     /* ---------------- playback ---------------- */
