@@ -167,6 +167,8 @@
     .lydlg h3 { margin: 0 0 4px; }
     .lydlg .hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
     .legal-note { font-size: 13px; line-height: 1.5; color: var(--muted); margin: 0 0 12px; }
+    .bulk-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+    .row.picked { box-shadow: inset 3px 0 0 var(--accent); }
     .lydlg .dlg-btns { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 14px; }
     .grp { font-size: 14px; color: var(--accent); margin: 16px 4px 6px; }
     .field[hidden] { display: none; }
@@ -404,6 +406,10 @@
       <section class="view" id="view-library" aria-label="library">
         <input class="field" id="searchInput" type="search" data-i18n-ph="searchPh" placeholder="검색 (제목, 아티스트)">
         <div class="chips" id="groupChips"></div>
+        <div class="bulk-bar" id="bulkBar">
+          <button class="chip" id="selectToggle" type="button"></button>
+          <button class="btn" id="bulkEdit" type="button" hidden></button>
+        </div>
         <div class="chips" id="yearChips" hidden></div>
         <div class="year-row">
           <input type="range" id="yearSlider" min="1970" max="2025" step="1" value="2000" aria-label="year">
@@ -421,6 +427,19 @@
             <input class="field" id="infoYear" type="number" inputmode="numeric" min="1900" max="2100" data-i18n-ph="yearPh" placeholder="연도 (선택)">
             <div class="dlg-btns">
               <button class="row-btn" id="infoCancel" type="button" data-i18n="lyCancel">취소</button>
+              <button class="btn" type="submit" data-i18n="saveInfo">저장</button>
+            </div>
+          </form>
+        </dialog>
+        <dialog class="lydlg" id="bulkDlg">
+          <form id="bulkForm">
+            <h3 id="bulkTitle"></h3>
+            <p class="legal-note" data-i18n="bulkHint"></p>
+            <input class="field" id="bulkArtist" type="text" maxlength="80" data-i18n-ph="artistPh" placeholder="아티스트 (선택)">
+            <input class="field" id="bulkGenre" type="text" maxlength="60" data-i18n-ph="genrePh" placeholder="장르 (선택)">
+            <input class="field" id="bulkYear" type="number" inputmode="numeric" min="1900" max="2100" data-i18n-ph="yearPh" placeholder="연도 (선택)">
+            <div class="dlg-btns">
+              <button class="row-btn" id="bulkCancel" type="button" data-i18n="lyCancel">취소</button>
               <button class="btn" type="submit" data-i18n="saveInfo">저장</button>
             </div>
           </form>
@@ -646,6 +665,8 @@
       ko: {
         tabHome: '홈', tabLib: '보관함', tabUpload: '업로드', tabSettings: '내 정보', searchPh: '검색 (제목, 아티스트)',
         uploadTitle: '파일 업로드',
+        selectMode: '선택', selectDone: '선택 끝', bulkEdit: (n) => `선택한 ${n}곡 수정`,
+        bulkHint: '비워 둔 칸은 바꾸지 않습니다.', bulkSaved: (n) => `${n}곡을 수정했습니다`,
         legalUpload: '업로드하는 음원은 본인이 저작권을 가지고 있거나 사용 허락을 받은 것만 올려 주세요. 타인의 저작물을 무단으로 올리거나 공유하면 저작권법에 따라 책임을 질 수 있습니다.',
         tabLogin: '로그인', tabSignup: '회원가입', emailPh: '이메일', passwordPh: '비밀번호 (8자 이상)',
         account: '계정', logout: '로그아웃', sessionEnded: '다시 로그인해 주세요',
@@ -691,6 +712,8 @@
       en: {
         tabHome: 'Home', tabLib: 'Library', tabUpload: 'Upload', tabSettings: 'Me', searchPh: 'Search (title, artist)',
         uploadTitle: 'Upload files',
+        selectMode: 'Select', selectDone: 'Done', bulkEdit: (n) => `Edit ${n} songs`,
+        bulkHint: 'Empty fields are left unchanged.', bulkSaved: (n) => `Updated ${n} songs`,
         legalUpload: 'Only upload music you own or have permission to use. Uploading or sharing copyrighted works of others without permission may violate copyright law.',
         tabLogin: 'Log in', tabSignup: 'Sign up', emailPh: 'Email', passwordPh: 'Password (8+ characters)',
         account: 'Account', logout: 'Log out', sessionEnded: 'Please log in again',
@@ -861,7 +884,7 @@
         el('span', { class: 'meta' },
           el('span', { class: 't' }, s.title || 'Untitled'),
           el('span', { class: 'a' }, sub)));
-      main.addEventListener('click', () => playIndex(i));
+      main.addEventListener('click', () => { if (selectMode) togglePick(s.id); else playIndex(i); });
       const edit = el('button', { class: 'row-btn', type: 'button', 'aria-label': T('editInfo') }, '✎');
       edit.addEventListener('click', () => openInfo(s));
       const lyr = el('button', { class: 'row-btn', type: 'button', 'aria-label': T('addLyrics') }, T('lyricsBtn'));
@@ -875,10 +898,11 @@
         kids.push(find);
       }
       kids.push(edit, lyr, del);
-      return el('div', { class: 'row' + (i === idx ? ' playing' : '') }, ...kids);
+      return el('div', { class: 'row' + (i === idx ? ' playing' : '') + (selectMode && picked.has(s.id) ? ' picked' : '') }, ...kids);
     }
     function renderLibrary() {
       renderYearChips();
+      renderBulkBar();
       renderGroupChips();
       const list = $('#list');
       $('#count').textContent = songs.length ? `${songs.length}` : '';
@@ -962,6 +986,62 @@
       lyIdx = i;
       $('#lyCur').textContent = i >= 0 ? lyLines[i].text : '';
     }
+
+    /* ---------------- select several songs and edit them together ---------------- */
+    let selectMode = false;
+    const picked = new Set();
+    function togglePick(id) {
+      if (picked.has(id)) picked.delete(id); else picked.add(id);
+      renderLibrary();
+    }
+    function renderBulkBar() {
+      if (!$('#selectToggle')) return;
+      $('#selectToggle').textContent = selectMode ? T('selectDone') : T('selectMode');
+      const b = $('#bulkEdit');
+      b.hidden = !(selectMode && picked.size);
+      b.textContent = T('bulkEdit', picked.size);
+    }
+    $('#selectToggle').addEventListener('click', () => {
+      selectMode = !selectMode;
+      if (!selectMode) picked.clear();
+      renderLibrary();
+    });
+    $('#bulkEdit').addEventListener('click', () => {
+      $('#bulkArtist').value = '';
+      $('#bulkGenre').value = '';
+      $('#bulkYear').value = '';
+      $('#bulkTitle').textContent = T('bulkEdit', picked.size);
+      $('#bulkDlg').showModal();
+    });
+    $('#bulkCancel').addEventListener('click', () => $('#bulkDlg').close());
+    $('#bulkForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('#bulkDlg').close();
+      const y = parseInt($('#bulkYear').value, 10);
+      const fields = {};
+      const artistV = $('#bulkArtist').value.trim();
+      const genreV = $('#bulkGenre').value.trim();
+      if (artistV) fields.artist = artistV;
+      if (genreV) fields.genre = genreV;
+      if (y >= 1900 && y <= 2100) fields.year = y;
+      if (!Object.keys(fields).length) return;
+      let done = 0;
+      for (const s of songs.filter((x) => picked.has(x.id))) {
+        try {
+          await api(`/api/songs?id=${encodeURIComponent(s.id)}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields)
+          });
+          Object.assign(s, fields);
+          done++;
+        } catch (err) {
+          if (err.message === 'unauthorized') break;
+        }
+      }
+      picked.clear();
+      selectMode = false;
+      renderLibrary();
+      toast(T('bulkSaved', done));
+    });
 
     /* ---------------- year filter (Time Capsule) ---------------- */
     let yearFilter = '';
@@ -1922,6 +2002,14 @@
     }
 
     let busy = false;
+    // "01. 아티스트 - 제목.mp3" -> artist + title; a name without " - " is only the title
+    function nameParts(fileName) {
+      let n = fileName.replace(/\.[^/.]+$/, '').trim();
+      n = n.replace(/^\d{1,3}\s*[.\-_)]\s+/, '');   // leading track number
+      const m = n.match(/^(.+?)\s+[-\u2013\u2014]\s+(.+)$/);
+      if (m) return { artist: m[1].trim(), title: m[2].trim() };
+      return { artist: null, title: n || null };
+    }
     async function handleFiles(fileList) {
       if (busy) return;
       const files = [...fileList];
@@ -1956,12 +2044,13 @@
           const lyrics = lrc ? await lrc.text() : null;
           // typed values win; otherwise the file's own tags (title, artist, album, genre, year, cover) are used
           const tags = await readTags(f);
+          const named = nameParts(f.name);
           const tagYear = parseInt(tags.year, 10);
           const song = await uploadOne(f, (v) => row.set('', typeof v === 'number' ? `${v}%` : v), {
             lyrics,
             year: year || (tagYear >= 1900 && tagYear <= 2100 ? tagYear : null),
-            artist: artist || tags.artist || null,
-            title: titleOne || tags.title || null,
+            artist: artist || tags.artist || named.artist || null,
+            title: titleOne || tags.title || named.title || null,
             album: tags.album || null,
             genre: tags.genre || null,
             cover: tags.cover || null
