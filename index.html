@@ -779,14 +779,30 @@
       const safe = file.name.replace(/[^A-Za-z0-9._-]/g, '_').slice(-120);
       const pathname = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`;
       // the browser sends the file straight to Blob; the server only issues a token after the password check
-      const blob = await upload(pathname, file, {
+      const uploadOpts = {
         access: 'public',
         handleUploadUrl: '/api/blob-token',
         clientPayload: JSON.stringify({ token: getToken() }),
         multipart: file.size > 50 * 1024 * 1024,   // split only big files
         contentType: mimeFor(file),
         onUploadProgress: (e) => onPct && onPct(Math.round(e.percentage))
-      });
+      };
+      let blob;
+      try {
+        blob = await upload(pathname, file, uploadOpts);
+      } catch (err) {
+        // the SDK hides the server's reason; ask the token route directly to show it
+        if (String(err.message).includes('client token')) {
+          const probe = await fetch('/api/blob-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'blob.generate-client-token', payload: { pathname: 'probe.mp3', callbackUrl: location.origin + '/api/blob-token', multipart: false, clientPayload: uploadOpts.clientPayload } })
+          });
+          const why = await probe.json().catch(() => ({}));
+          throw new Error(why.error || `HTTP ${probe.status}`);
+        }
+        throw err;
+      }
 
       const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 80) || 'Untitled';
       await api('/api/songs', {
