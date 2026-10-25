@@ -798,7 +798,11 @@
       };
       let blob;
       try {
-        blob = await upload(pathname, file, uploadOpts);
+        // give the file transfer 3 minutes; without a limit a stalled transfer waits forever
+        blob = await Promise.race([
+          upload(pathname, file, uploadOpts),
+          new Promise((_, reject) => setTimeout(() => reject(new Error(T('timeout'))), 180000))
+        ]);
       } catch (err) {
         // the SDK hides the server's reason; ask the token route directly to show it
         if (String(err.message).includes('client token')) {
