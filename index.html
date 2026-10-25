@@ -124,7 +124,6 @@
     @media (prefers-reduced-motion: reduce) { .vinyl.spin { animation: none; } }
     .np-big { font-size: 20px; font-weight: 700; margin: 0 0 4px; overflow-wrap: anywhere; }
     .np-sub { color: var(--muted); margin: 0; }
-    .hint { color: var(--muted); font-size: 16px; margin-top: 12px; }
 
     /* ---------- player bar (one-hand zone) ---------- */
     .player {
@@ -227,10 +226,8 @@
       padding: 0 16px; transition: transform .08s ease;
     }
     .btn:disabled { opacity: .5; }
-    .btn.ghost { background: var(--surface-2); color: var(--fg); font-weight: 600; }
     .card { background: var(--surface); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
     .card h2 { font-size: 18px; margin: 0 0 8px; }
-    .card p { margin: 0 0 12px; color: var(--muted); }
     .log { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
     .log li { display: flex; justify-content: space-between; gap: 12px; font-size: 16px; }
     .log .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
@@ -318,7 +315,6 @@
           <div class="vinyl paused" id="vinyl"><div class="label">LP</div></div>
           <p class="np-big" id="bigTitle">—</p>
           <p class="np-sub" id="bigArtist"></p>
-          <p class="hint" data-i18n="swipeHint">좌우 스와이프로 이전·다음 곡</p>
         </div>
       </section>
 
@@ -331,7 +327,6 @@
       <section class="view" id="view-upload" aria-label="upload">
         <div class="card">
           <h2 data-i18n="uploadTitle">파일 업로드</h2>
-          <p data-i18n="pickHint">iCloud, 네이버 클라우드, NAS의 mp3 / m4a / wav / flac 등</p>
           <button class="btn" id="pickBtn" type="button" data-i18n="pickFiles">파일 선택 (여러 개 가능)</button>
           <input class="sr-only" id="fileInput" type="file" multiple
                  accept="audio/*,video/*,.mp3,.m4a,.wav,.flac,.aac,.ogg,.opus,.mp4">
@@ -411,7 +406,6 @@
   <div class="lock" id="lock" hidden>
     <form class="lock-card" id="lockForm" autocomplete="on">
       <h2>LPPlayer</h2>
-      <p data-i18n="lockHint">비밀번호를 입력하세요</p>
       <input type="password" id="lockInput" name="password" autocomplete="current-password"
              autocapitalize="off" autocorrect="off" spellcheck="false" required>
       <p class="err" id="lockErr" hidden data-i18n="wrongKey">비밀번호가 맞지 않습니다</p>
@@ -435,12 +429,10 @@
         nothing: '재생 중인 곡 없음',
         noSongs: '아직 곡이 없습니다. 업로드 탭에서 파일을 추가하세요.',
         loadFail: '곡 목록을 불러오지 못했습니다',
-        swipeHint: '좌우 스와이프로 이전·다음 곡',
         artistUnknown: '알 수 없음',
         prev: '이전', next: '다음', play: '재생', pause: '일시정지', delete: '삭제',
         delConfirm: '이 곡을 목록에서 삭제할까요?',
         pickFiles: '파일 선택 (여러 개 가능)',
-        pickHint: 'iCloud, 네이버 클라우드, NAS의 mp3 / m4a / wav / flac 등',
         uploading: '업로드 중…', done: '완료', badType: '오디오 파일이 아닙니다',
         uploadProgress: (n, t) => `${n} / ${t} 업로드 중`,
         uploadOk: (n) => `${n}곡 업로드 완료`,
@@ -450,8 +442,6 @@
         iosHint: 'Safari 하단의 공유 버튼 → "홈 화면에 추가"를 누르세요.',
         rotate: '세로 모드로 돌려주세요',
         playFail: '재생할 수 없는 파일입니다',
-        loadErr: '불러오기 오류',
-        lockHint: '비밀번호를 입력하세요',
         wrongKey: '비밀번호가 맞지 않습니다',
         enter: '들어가기',
         tooBig: '500MB를 넘는 파일입니다'
@@ -462,12 +452,10 @@
         nothing: 'Nothing playing',
         noSongs: 'No tracks yet. Add files in the Upload tab.',
         loadFail: 'Could not load your library',
-        swipeHint: 'Swipe left/right for next/prev',
         artistUnknown: 'Unknown',
         prev: 'Previous', next: 'Next', play: 'Play', pause: 'Pause', delete: 'Delete',
         delConfirm: 'Remove this track from the library?',
         pickFiles: 'Choose files (multiple allowed)',
-        pickHint: 'mp3 / m4a / wav / flac from iCloud, Naver Cloud or NAS',
         uploading: 'Uploading…', done: 'Done', badType: 'Not an audio file',
         uploadProgress: (n, t) => `Uploading ${n} / ${t}`,
         uploadOk: (n) => `${n} track(s) uploaded`,
@@ -477,8 +465,6 @@
         iosHint: 'Tap the Share button in Safari, then "Add to Home Screen".',
         rotate: 'Please rotate to portrait',
         playFail: 'This file cannot be played',
-        loadErr: 'Load error',
-        lockHint: 'Enter the password',
         wrongKey: 'Wrong password',
         enter: 'Enter',
         tooBig: 'File is larger than 500 MB'
