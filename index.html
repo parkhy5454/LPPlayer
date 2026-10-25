@@ -211,7 +211,7 @@
     .tabbar {
       flex: none;
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       background: var(--bg);
       padding-bottom: var(--safe-b);
       border-top: 1px solid var(--border);
@@ -219,7 +219,7 @@
     .tab {
       min-height: 60px; border: 0; background: transparent; color: var(--muted);
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-      font-size: 16px; padding: 6px 0;
+      font-size: 14px; padding: 6px 0; white-space: nowrap; min-width: 0;
       transition: transform .08s ease;
     }
     .tab.on { color: var(--accent); }
