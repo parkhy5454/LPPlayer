@@ -2125,8 +2125,12 @@
           s = new TextDecoder('utf-8').decode(body);
         } else {
           // Latin-1 tags are often UTF-8 in practice; fall back to Western European text otherwise
+          // Korean tags written by older programs hold EUC-KR (CP949) bytes under encoding 0
           try { s = new TextDecoder('utf-8', { fatal: true }).decode(body); }
-          catch { s = new TextDecoder('windows-1252').decode(body); }
+          catch {
+            try { s = new TextDecoder('euc-kr', { fatal: true }).decode(body); }
+            catch { s = new TextDecoder('windows-1252').decode(body); }
+          }
         }
       } catch { return ''; }
       return s.split('\0')[0].trim();   // several values may be separated by nulls; the first one is used
