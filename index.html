@@ -158,6 +158,10 @@
     .lydlg .hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
     .lydlg .dlg-btns { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 14px; }
     .grp { font-size: 14px; color: var(--accent); margin: 16px 4px 6px; }
+    .field[hidden] { display: none; }
+    .acct-line { margin: 6px 0; font-size: 15px; overflow-wrap: anywhere; }
+    .acct-k { color: var(--muted); margin-right: 6px; }
+    .acct-btns { display: grid; gap: 8px; margin: 12px 0; }
     .row-main .thumb { width: 44px; height: 44px; flex: none; border-radius: 8px; object-fit: cover; background: var(--surface); }
     .adm-list { list-style: none; margin: 8px 0 14px; padding: 0; }
     .adm-list li { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--muted); }
@@ -479,6 +483,13 @@
         <div class="card">
           <h2 data-i18n="account">계정</h2>
           <p class="account-email" id="accountEmail"></p>
+          <p class="acct-line"><span class="acct-k" data-i18n="accountName">이름</span> <span id="accountName"></span></p>
+          <p class="acct-line"><span class="acct-k" data-i18n="accountPhone">휴대폰</span> <span id="accountPhone"></span></p>
+          <div class="acct-btns">
+            <button class="btn btn-secondary" id="editProfileBtn" type="button" data-i18n="editProfile">내 정보 수정</button>
+            <button class="btn btn-secondary" id="changeEmailBtn" type="button" data-i18n="changeEmail">이메일 변경</button>
+            <button class="btn btn-secondary" id="changePwBtn" type="button" data-i18n="changePw">비밀번호 변경</button>
+          </div>
           <button class="btn btn-secondary" id="logoutBtn" type="button" data-i18n="logout">로그아웃</button>
         </div>
         <div class="card">
@@ -569,11 +580,50 @@
              autocapitalize="off" autocorrect="off" spellcheck="false" data-i18n-ph="emailPh" placeholder="이메일" required>
       <input type="password" id="authPw" name="password" autocomplete="current-password"
              data-i18n-ph="passwordPh" placeholder="비밀번호 (8자 이상)" required>
+      <input type="text" id="authName" maxlength="20" autocomplete="name" data-i18n-ph="namePh" placeholder="이름" hidden>
+      <input type="tel" id="authPhone" maxlength="20" autocomplete="tel" inputmode="tel" data-i18n-ph="phonePh" placeholder="휴대폰 번호 (010-0000-0000)" hidden>
       <p class="err" id="lockErr" hidden></p>
       <button class="btn" type="submit" id="authSubmit">로그인</button>
     </form>
   </div>
 
+  <dialog class="lydlg" id="profileDlg">
+          <form id="profileForm">
+            <h3 data-i18n="editProfile">내 정보 수정</h3>
+            <input class="field" id="profName" type="text" maxlength="20" data-i18n-ph="namePh" placeholder="이름">
+            <input class="field" id="profPhone" type="tel" maxlength="20" inputmode="tel" data-i18n-ph="phonePh" placeholder="휴대폰 번호 (010-0000-0000)">
+            <p class="err" id="profErr" hidden></p>
+            <div class="dlg-btns">
+              <button class="row-btn" type="button" data-close="profileDlg" data-i18n="lyCancel">취소</button>
+              <button class="btn" type="submit" data-i18n="saveInfo">저장</button>
+            </div>
+          </form>
+        </dialog>
+  <dialog class="lydlg" id="emailDlg">
+          <form id="emailForm">
+            <h3 data-i18n="changeEmail">이메일 변경</h3>
+            <input class="field" id="emailNew" type="email" autocomplete="email" data-i18n-ph="newEmailPh" placeholder="새 이메일">
+            <input class="field" id="emailPw" type="password" autocomplete="current-password" data-i18n-ph="currentPw" placeholder="현재 비밀번호">
+            <p class="err" id="emailErr" hidden></p>
+            <div class="dlg-btns">
+              <button class="row-btn" type="button" data-close="emailDlg" data-i18n="lyCancel">취소</button>
+              <button class="btn" type="submit" data-i18n="saveInfo">저장</button>
+            </div>
+          </form>
+        </dialog>
+  <dialog class="lydlg" id="pwDlg">
+          <form id="pwForm">
+            <h3 data-i18n="changePw">비밀번호 변경</h3>
+            <input class="field" id="pwCur" type="password" autocomplete="current-password" data-i18n-ph="currentPw" placeholder="현재 비밀번호">
+            <input class="field" id="pwNew" type="password" autocomplete="new-password" data-i18n-ph="newPw" placeholder="새 비밀번호 (8자 이상)">
+            <input class="field" id="pwNew2" type="password" autocomplete="new-password" data-i18n-ph="newPwConfirm" placeholder="새 비밀번호 확인">
+            <p class="err" id="pwErr" hidden></p>
+            <div class="dlg-btns">
+              <button class="row-btn" type="button" data-close="pwDlg" data-i18n="lyCancel">취소</button>
+              <button class="btn" type="submit" data-i18n="saveInfo">저장</button>
+            </div>
+          </form>
+        </dialog>
   <audio id="audio" preload="metadata" playsinline></audio>
   <!-- direct-to-Blob upload client, bundled from @vercel/blob (see README) -->
 
@@ -612,6 +662,10 @@
         roomEnded: '방이 종료되었습니다', hostOnly: '방장만 조작할 수 있습니다', queueAdd: '다음 곡에 추가',
         queueTitle: '내 곡', queueNext: '다음 곡', tapToPlay: '화면을 눌러 재생을 시작하세요',
         lyricsBtn: '가사', addLyrics: '가사 추가', lyricsSaved: '가사를 저장했습니다',
+        accountName: '이름', accountPhone: '휴대폰', editProfile: '내 정보 수정', changeEmail: '이메일 변경',
+        changePw: '비밀번호 변경', namePh: '이름', phonePh: '휴대폰 번호 (010-0000-0000)', currentPw: '현재 비밀번호',
+        newPw: '새 비밀번호 (8자 이상)', newPwConfirm: '새 비밀번호 확인', newEmailPh: '새 이메일',
+        pwMismatch: '새 비밀번호가 서로 다릅니다', accountSaved: '변경했습니다', notSet: '(미입력)',
         groupNone: '묶지 않음', groupArtist: '아티스트별', groupAlbum: '앨범별', groupGenre: '장르별',
         unknownGroup: '알 수 없음', editInfo: '정보 수정', editInfoTitle: '곡 정보 수정', albumPh: '앨범 (선택)',
         genrePh: '장르 (선택)', saveInfo: '저장', infoSaved: '곡 정보를 저장했습니다',
@@ -652,6 +706,10 @@
         roomEnded: 'The room has ended', hostOnly: 'Only the host can control playback', queueAdd: 'Add to next',
         queueTitle: 'My tracks', queueNext: 'Up next', tapToPlay: 'Tap the screen to start playing',
         lyricsBtn: 'Lyrics', addLyrics: 'Add lyrics', lyricsSaved: 'Lyrics saved',
+        accountName: 'Name', accountPhone: 'Phone', editProfile: 'Edit profile', changeEmail: 'Change email',
+        changePw: 'Change password', namePh: 'Name', phonePh: 'Phone (010-0000-0000)', currentPw: 'Current password',
+        newPw: 'New password (8+ characters)', newPwConfirm: 'Confirm new password', newEmailPh: 'New email',
+        pwMismatch: 'New passwords do not match', accountSaved: 'Saved', notSet: '(not set)',
         groupNone: 'No grouping', groupArtist: 'By artist', groupAlbum: 'By album', groupGenre: 'By genre',
         unknownGroup: 'Unknown', editInfo: 'Edit info', editInfoTitle: 'Edit song info', albumPh: 'Album (optional)',
         genrePh: 'Genre (optional)', saveInfo: 'Save', infoSaved: 'Song info saved',
@@ -701,6 +759,9 @@
       document.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
       $('#authSubmit').textContent = T(m === 'login' ? 'tabLogin' : 'tabSignup');
       $('#authPw').setAttribute('autocomplete', m === 'login' ? 'current-password' : 'new-password');
+      // name and phone are asked only when signing up
+      $('#authName').hidden = m !== 'signup';
+      $('#authPhone').hidden = m !== 'signup';
     }
     function renderAccount() { $('#accountEmail').textContent = store.get(EMAIL_NAME) || ''; }
     function endSession(message) {
@@ -1207,6 +1268,88 @@
       }
     });
 
+    /* ---------------- my account: name, phone, email, password ---------------- */
+    let accountInfo = { email: '', name: '', phone: '' };
+    const showErr = (id, msg) => { $(id).textContent = msg || ''; $(id).hidden = !msg; };
+    function renderAccountInfo() {
+      $('#accountEmail').textContent = accountInfo.email;
+      $('#accountName').textContent = accountInfo.name || T('notSet');
+      $('#accountPhone').textContent = accountInfo.phone || T('notSet');
+    }
+    async function loadAccount() {
+      try {
+        const d = await api('/api/account');
+        accountInfo = { email: d.user.email, name: d.user.name, phone: d.user.phone };
+        store.set(EMAIL_NAME, d.user.email);
+        renderAccountInfo();
+      } catch {}   // offline: the card keeps what it showed last
+    }
+    document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => $(`#${b.dataset.close}`).close()));
+
+    $('#editProfileBtn').addEventListener('click', () => {
+      $('#profName').value = accountInfo.name;
+      $('#profPhone').value = accountInfo.phone;
+      showErr('#profErr', '');
+      $('#profileDlg').showModal();
+    });
+    $('#profileForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const d = await api('/api/account', {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: $('#profName').value, phone: $('#profPhone').value })
+        });
+        accountInfo = { ...accountInfo, name: d.user.name, phone: d.user.phone };
+        renderAccountInfo();
+        $('#profileDlg').close();
+        toast(T('accountSaved'));
+      } catch (err) { showErr('#profErr', err.message); }
+    });
+
+    $('#changeEmailBtn').addEventListener('click', () => {
+      $('#emailNew').value = '';
+      $('#emailPw').value = '';
+      showErr('#emailErr', '');
+      $('#emailDlg').showModal();
+    });
+    $('#emailForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const d = await api('/api/account?action=email', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: $('#emailNew').value, password: $('#emailPw').value })
+        });
+        // the token carries the email, so the new one replaces the old token
+        store.set(TOKEN_NAME, d.token);
+        store.set(EMAIL_NAME, d.user.email);
+        accountInfo = { ...accountInfo, email: d.user.email };
+        renderAccountInfo();
+        $('#emailDlg').close();
+        toast(T('accountSaved'));
+      } catch (err) { showErr('#emailErr', err.message); }
+    });
+
+    $('#changePwBtn').addEventListener('click', () => {
+      $('#pwCur').value = '';
+      $('#pwNew').value = '';
+      $('#pwNew2').value = '';
+      showErr('#pwErr', '');
+      $('#pwDlg').showModal();
+    });
+    $('#pwForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const next = $('#pwNew').value;
+      if (next !== $('#pwNew2').value) return showErr('#pwErr', T('pwMismatch'));
+      try {
+        await api('/api/account?action=password', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ current: $('#pwCur').value, next })
+        });
+        $('#pwDlg').close();
+        toast(T('accountSaved'));
+      } catch (err) { showErr('#pwErr', err.message); }
+    });
+
     /* ---------------- admin (shown only to accounts listed in ADMIN_EMAILS) ---------------- */
     const fmtMB = (b) => (b / 1048576).toFixed(1);
     async function loadAdmin() {
@@ -1421,7 +1564,7 @@
       });
       $('#main').scrollTop = 0;
       if (name === 'together') renderHostSongs();
-      if (name === 'settings') loadAdmin();
+      if (name === 'settings') { loadAdmin(); loadAccount(); }
     }
     document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
 
@@ -1809,7 +1952,10 @@
         const r = await fetch(authMode === 'login' ? '/api/auth/login' : '/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({
+            email, password,
+            ...(authMode === 'signup' ? { name: $('#authName').value.trim(), phone: $('#authPhone').value.trim() } : {})
+          })
         });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
