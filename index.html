@@ -799,7 +799,7 @@
             body: JSON.stringify({ type: 'blob.generate-client-token', payload: { pathname: 'probe.mp3', callbackUrl: location.origin + '/api/blob-token', multipart: false, clientPayload: uploadOpts.clientPayload } })
           });
           const why = await probe.json().catch(() => ({}));
-          throw new Error(why.error || `HTTP ${probe.status}`);
+          throw new Error(why.diagnostics ? `${why.error} ${JSON.stringify(why.diagnostics)}` : (why.error || `HTTP ${probe.status}`));
         }
         throw err;
       }
