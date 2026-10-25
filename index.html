@@ -169,6 +169,13 @@
     .legal-note { font-size: 13px; line-height: 1.5; color: var(--muted); margin: 0 0 12px; }
     .bulk-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
     .row.picked { box-shadow: inset 3px 0 0 var(--accent); }
+    .cap-bar { margin: 8px 0 0; }
+    .cap-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+    .letter-body { white-space: pre-wrap; line-height: 1.6; overflow-wrap: anywhere; }
+    .letter-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.1); }
+    /* time capsule mode: sepia record with the year on the label */
+    .vinyl.retro { filter: sepia(.65) contrast(1.05) saturate(.8); }
+    .vinyl.retro .label { font-size: 20px; }
     .lydlg .dlg-btns { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 14px; }
     .grp { font-size: 14px; color: var(--accent); margin: 16px 4px 6px; }
     .field[hidden] { display: none; }
@@ -394,6 +401,17 @@
       <section class="view active" id="view-home" aria-label="home">
         <div class="stage" id="stage">
           <div class="disc-box"><div class="vinyl paused" id="vinyl"><div class="label">LP</div><div class="ring-text" id="ringText"></div></div><svg class="tonearm" id="tonearm" viewBox="0 0 100 100" aria-hidden="true"><circle class="arm-base" cx="90" cy="8" r="4.5"/><g id="armG"><line x1="90" y1="8" x2="90" y2="54"/><rect x="87.6" y="52" width="4.8" height="8" rx="1"/></g></svg></div>
+          <div class="cap-bar">
+            <div class="year-row">
+              <input type="range" id="capSlider" min="1970" max="2025" step="1" value="1995" aria-label="time capsule year">
+              <span class="year-val" id="capVal">—</span>
+              <button class="chip" id="capOff" type="button" data-i18n="capOff" hidden>끄기</button>
+            </div>
+            <div class="cap-actions">
+              <button class="chip" id="letterWriteBtn" type="button" hidden></button>
+              <button class="chip" id="letterListBtn" type="button"></button>
+            </div>
+          </div>
           <p class="np-big" id="bigTitle">—</p>
           <p class="np-sub" id="bigArtist"></p>
           <div class="lyrics" id="lyrics" hidden>
@@ -653,7 +671,36 @@
             </div>
           </form>
         </dialog>
-  <audio id="audio" preload="metadata" playsinline></audio>
+      <dialog class="lydlg" id="letterDlg">
+          <form id="letterForm">
+            <h3 id="letterTitle"></h3>
+            <textarea class="field" id="letterText" rows="7" maxlength="2000" data-i18n-ph="letterPh" placeholder="그 해의 나에게 편지를 써 보세요"></textarea>
+            <select class="field" id="letterSong"></select>
+            <select class="field" id="letterYears">
+              <option value="1" data-i18n="letterYears1">1년 후 열기</option>
+              <option value="5" data-i18n="letterYears5" selected>5년 후 열기</option>
+              <option value="10" data-i18n="letterYears10">10년 후 열기</option>
+            </select>
+            <div class="dlg-btns">
+              <button class="row-btn" id="letterCancel" type="button" data-i18n="lyCancel">취소</button>
+              <button class="btn" type="submit" data-i18n="letterSubmit">타임캡슐에 넣기</button>
+            </div>
+          </form>
+        </dialog>
+    <dialog class="lydlg" id="letterListDlg">
+          <h3 data-i18n="letterListTitle">📮 타임캡슐</h3>
+          <div id="letterList"></div>
+          <div class="dlg-btns"><button class="row-btn" id="letterListClose" type="button" data-i18n="close">닫기</button></div>
+        </dialog>
+    <dialog class="lydlg" id="letterViewDlg">
+          <h3 id="letterViewTitle"></h3>
+          <p class="letter-body" id="letterViewBody"></p>
+          <div class="dlg-btns">
+            <button class="row-btn" id="letterViewClose" type="button" data-i18n="close">닫기</button>
+            <button class="btn" id="letterViewPlay" type="button" hidden></button>
+          </div>
+        </dialog>
+<audio id="audio" preload="metadata" playsinline></audio>
   <!-- direct-to-Blob upload client, bundled from @vercel/blob (see README) -->
 
   <script>
@@ -665,6 +712,13 @@
       ko: {
         tabHome: '홈', tabLib: '보관함', tabUpload: '업로드', tabSettings: '내 정보', searchPh: '검색 (제목, 아티스트)',
         uploadTitle: '파일 업로드',
+        capOff: '끄기', letterWrite: (y) => `📮 ${y}년의 나에게 편지 쓰기`, letterList: (n) => `📮 편지함${n ? ` (${n})` : ''}`,
+        letterNone: '아직 편지가 없습니다', letterOpen: '열어 보기', letterOpenedRow: (y) => `${y}년의 나에게 보낸 편지 (열림)`,
+        letterLockedRow: (y, when) => `${y}년의 나에게 · ${when}에 열림`, letterViewTitle: (y) => `${y}년의 나에게`,
+        letterPlaySong: '이 노래 듣기', letterArrived: (y) => `📮 ${y}년 타임캡슐이 도착했어요`, letterEmpty: '편지 내용을 입력해 주세요',
+        letterSaved: '타임캡슐에 넣었습니다', noSong: '곡 첨부 안 함', letterYears1: '1년 후 열기', letterYears5: '5년 후 열기',
+        letterYears10: '10년 후 열기', letterPh: '그 해의 나에게 편지를 써 보세요', letterSubmit: '타임캡슐에 넣기',
+        letterListTitle: '📮 타임캡슐', close: '닫기',
         selectMode: '선택', selectDone: '선택 끝', bulkEdit: (n) => `선택한 ${n}곡 수정`,
         bulkHint: '비워 둔 칸은 바꾸지 않습니다.', bulkSaved: (n) => `${n}곡을 수정했습니다`,
         legalUpload: '업로드하는 음원은 본인이 저작권을 가지고 있거나 사용 허락을 받은 것만 올려 주세요. 타인의 저작물을 무단으로 올리거나 공유하면 저작권법에 따라 책임을 질 수 있습니다.',
@@ -712,6 +766,13 @@
       en: {
         tabHome: 'Home', tabLib: 'Library', tabUpload: 'Upload', tabSettings: 'Me', searchPh: 'Search (title, artist)',
         uploadTitle: 'Upload files',
+        capOff: 'Off', letterWrite: (y) => `📮 Write to my ${y} self`, letterList: (n) => `📮 Letters${n ? ` (${n})` : ''}`,
+        letterNone: 'No letters yet', letterOpen: 'Open', letterOpenedRow: (y) => `Letter to my ${y} self (open)`,
+        letterLockedRow: (y, when) => `To my ${y} self · opens ${when}`, letterViewTitle: (y) => `To my ${y} self`,
+        letterPlaySong: 'Play this song', letterArrived: (y) => `📮 Your ${y} time capsule has arrived`, letterEmpty: 'Write something first',
+        letterSaved: 'Sealed in the time capsule', noSong: 'No song', letterYears1: 'Opens in 1 year', letterYears5: 'Opens in 5 years',
+        letterYears10: 'Opens in 10 years', letterPh: 'Write to your past self', letterSubmit: 'Seal it',
+        letterListTitle: '📮 Time capsule', close: 'Close',
         selectMode: 'Select', selectDone: 'Done', bulkEdit: (n) => `Edit ${n} songs`,
         bulkHint: 'Empty fields are left unchanged.', bulkSaved: (n) => `Updated ${n} songs`,
         legalUpload: 'Only upload music you own or have permission to use. Uploading or sharing copyrighted works of others without permission may violate copyright law.',
@@ -1042,6 +1103,121 @@
       renderLibrary();
       toast(T('bulkSaved', done));
     });
+
+    /* ---------------- time capsule: 📮 letters to your past self ---------------- */
+    let capYear = null;      // the year the home record is set to, or null
+    let letters = [];
+    const SEEN_KEY = 'lp_seen_letters';
+    function seenLetters() {
+      try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')); } catch { return new Set(); }
+    }
+    function markSeen(ids) {
+      try { localStorage.setItem(SEEN_KEY, JSON.stringify([...seenLetters(), ...ids])); } catch {}
+    }
+    function applyCap() {
+      const on = capYear !== null;
+      $('#vinyl').classList.toggle('retro', on);
+      $('#vinyl .label').textContent = on ? String(capYear) : 'LP';
+      $('#capVal').textContent = on ? String(capYear) : '—';
+      $('#capOff').hidden = !on;
+      $('#letterWriteBtn').hidden = !on;
+      $('#letterWriteBtn').textContent = on ? T('letterWrite', capYear) : '';
+      const seen = seenLetters();
+      const unread = letters.filter((l) => l.opened && !seen.has(String(l.id))).length;
+      $('#letterListBtn').textContent = T('letterList', unread);
+    }
+    $('#capSlider').addEventListener('input', (e) => {
+      capYear = Number(e.target.value);
+      // the library's year filter follows the capsule year
+      yearFilter = e.target.value;
+      $('#yearSlider').value = e.target.value;
+      $('#yearVal').textContent = e.target.value;
+      applyCap();
+      renderLibrary();
+    });
+    $('#capOff').addEventListener('click', () => {
+      capYear = null;
+      yearFilter = '';
+      applyCap();
+      renderLibrary();
+    });
+    async function loadLetters(announce) {
+      try {
+        const d = await api('/api/letters');
+        letters = d.letters || [];
+      } catch { return; }
+      applyCap();
+      if (announce) {
+        const seen = seenLetters();
+        const fresh = letters.filter((l) => l.opened && !seen.has(String(l.id)));
+        if (fresh.length) toast(T('letterArrived', fresh[0].year));
+      }
+    }
+    function openLetterEditor() {
+      if (capYear === null) return;
+      $('#letterTitle').textContent = T('letterWrite', capYear);
+      $('#letterText').value = '';
+      const sel = $('#letterSong');
+      sel.textContent = '';
+      sel.append(el('option', { value: '' }, T('noSong')));
+      for (const s of songs) sel.append(el('option', { value: s.id }, `${s.title || 'Untitled'}${s.artist ? ' - ' + s.artist : ''}`));
+      $('#letterDlg').showModal();
+    }
+    $('#letterWriteBtn').addEventListener('click', openLetterEditor);
+    $('#letterCancel').addEventListener('click', () => $('#letterDlg').close());
+    $('#letterForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const content = $('#letterText').value.trim();
+      if (!content) return toast(T('letterEmpty'));
+      try {
+        await api('/api/letters', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ year: capYear, content, songId: $('#letterSong').value || null, years: Number($('#letterYears').value) })
+        });
+        $('#letterDlg').close();
+        toast(T('letterSaved'));
+        await loadLetters(false);
+      } catch (err) {
+        if (err.message !== 'unauthorized') toast(`${T('loadFail')}: ${err.message}`);
+      }
+    });
+    function openLetter(l) {
+      $('#letterViewTitle').textContent = T('letterViewTitle', l.year);
+      $('#letterViewBody').textContent = l.content || '';
+      const play = $('#letterViewPlay');
+      const at = l.song_id ? songs.findIndex((s) => s.id === l.song_id) : -1;
+      play.hidden = at < 0;
+      play.textContent = T('letterPlaySong');
+      play.onclick = () => {
+        $('#letterViewDlg').close();
+        if (!roomGuard()) playIndex(at);
+      };
+      $('#letterViewDlg').showModal();
+    }
+    $('#letterListBtn').addEventListener('click', () => {
+      const box = $('#letterList');
+      box.textContent = '';
+      if (!letters.length) box.append(el('p', { class: 'empty' }, T('letterNone')));
+      for (const l of letters) {
+        const kids = [];
+        if (l.opened) {
+          kids.push(el('span', {}, T('letterOpenedRow', l.year)));
+          const b = el('button', { class: 'row-btn', type: 'button' }, T('letterOpen'));
+          b.addEventListener('click', () => { $('#letterListDlg').close(); openLetter(l); });
+          kids.push(b);
+        } else {
+          const when = new Date(l.open_date).toLocaleDateString(lang === 'en' ? 'en-US' : 'ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+          kids.push(el('span', {}, T('letterLockedRow', l.year, when)));
+        }
+        box.append(el('div', { class: 'letter-row' }, ...kids));
+      }
+      $('#letterListDlg').showModal();
+      markSeen(letters.filter((l) => l.opened).map((l) => String(l.id)));
+      applyCap();
+    });
+    $('#letterListClose').addEventListener('click', () => $('#letterListDlg').close());
+    $('#letterViewClose').addEventListener('click', () => $('#letterViewDlg').close());
+    applyCap();
 
     /* ---------------- year filter (Time Capsule) ---------------- */
     let yearFilter = '';
@@ -2181,6 +2357,7 @@
         $('#lock').hidden = true;
         renderAccount();
         loadSongs();
+        loadLetters(true);
       } catch (err) {
         $('#lockErr').textContent = err.message;
         $('#lockErr').hidden = false;
@@ -2194,7 +2371,7 @@
     applyLang();
     applyPrivacy();
     renderAccount();
-    if (getToken()) loadSongs(); else showAuth('');
+    if (getToken()) { loadSongs(); loadLetters(true); } else showAuth('');
   })();
   </script>
 </body>
