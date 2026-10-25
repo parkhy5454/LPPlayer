@@ -603,16 +603,23 @@
       idx = ((i % songs.length) + songs.length) % songs.length;
       const s = songs[idx];
       audio.src = s.url;
-      audio.play().catch(() => {});
+      playAudio();
       if ('mediaSession' in navigator) {
         try { navigator.mediaSession.metadata = new MediaMetadata({ title: s.title || '', artist: s.artist || '' }); } catch {}
       }
       renderLibrary();
       updatePlayer();
     }
+    function playAudio() {
+      const p = audio.play();
+      if (p && p.catch) p.catch((e) => {
+        // AbortError = a newer track replaced this one; that is not a failure
+        if (e && e.name !== 'AbortError') toast(T('playFail'));
+      });
+    }
     function togglePlay() {
       if (idx < 0) return playIndex(0);
-      if (audio.paused) audio.play().catch(() => {}); else audio.pause();
+      if (audio.paused) playAudio(); else audio.pause();
     }
     function next() { playIndex(idx + 1); }
     function prev() {
@@ -652,7 +659,7 @@
       $('#tCur').textContent = fmt(audio.currentTime);
       if (audio.duration) $('#seek').value = Math.round((audio.currentTime / audio.duration) * 1000);
     });
-    audio.addEventListener('error', () => { if (idx >= 0) toast(T('playFail')); });
+    audio.addEventListener('error', () => { if (idx >= 0 && audio.error && audio.error.code !== 1) toast(T('playFail')); });
 
     $('#seek').addEventListener('input', (e) => {
       if (audio.duration) audio.currentTime = (e.target.value / 1000) * audio.duration;
@@ -725,6 +732,16 @@
     }
 
     const MAX_UPLOAD = 500 * 1024 * 1024;
+    // iCloud / NAS files often arrive with an empty type; without a real audio type the file will not play
+    const MIME_BY_EXT = {
+      mp3: 'audio/mpeg', m4a: 'audio/mp4', mp4: 'video/mp4', wav: 'audio/wav', flac: 'audio/flac',
+      aac: 'audio/aac', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', webm: 'video/webm'
+    };
+    function mimeFor(file) {
+      if (file.type && file.type !== 'application/octet-stream') return file.type;
+      const ext = (file.name.split('.').pop() || '').toLowerCase();
+      return MIME_BY_EXT[ext] || 'application/octet-stream';
+    }
     async function uploadOne(file, onPct) {
       if (file.size > MAX_UPLOAD) throw new Error(T('tooBig'));
       const upload = await window.lpUploadReady;   // bundled @vercel/blob client
@@ -737,7 +754,7 @@
         handleUploadUrl: '/api/blob-token',
         clientPayload: JSON.stringify({ key: getKey() }),
         multipart: file.size > 50 * 1024 * 1024,   // split only big files
-        contentType: file.type || 'application/octet-stream',
+        contentType: mimeFor(file),
         onUploadProgress: (e) => onPct && onPct(Math.round(e.percentage))
       });
 
