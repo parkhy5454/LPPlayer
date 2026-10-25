@@ -29,5 +29,63 @@ Error generating stack: `+o.message+`
 </script>
   <script>(function(){function m(a){var h=a.getAttribute("href");if(!h)return;try{var u=new URL(h,document.baseURI);if(((u.protocol==="http:"||u.protocol==="https:")&&u.host!==location.host)||u.protocol==="mailto:"||u.protocol==="tel:"||u.protocol==="sms:"){a.target="_blank";a.rel="noopener noreferrer";}}catch(e){}}function s(){document.querySelectorAll("a[href]").forEach(m);}if(document.readyState!=="loading"){s();}else{document.addEventListener("DOMContentLoaded",s);}document.addEventListener("click",function(e){var a=e.target&&e.target.closest&&e.target.closest("a[href]");if(a){m(a);}},true);})();</script>
   <script type="application/json" data-clippy-inline-media-manifest="1">{"version":1,"slots":[]}</script>
+
+<script>
+// CROSS-DEVICE UPLOAD FIX: Override upload to actually use Vercel Blob + NeonDB
+(function(){
+  const origConsole = console.log;
+  window.uploadToCrossDevice = async function(file){
+    if(!file) return;
+    const token = localStorage.getItem('lpplayer_token');
+    const statusEl = document.getElementById('uploadStatus') || {textContent:''};
+    try{
+      // 1. Upload file to Vercel Blob via /api/upload
+      const filename = `lpplayer_${Date.now()}_${file.name}`;
+      statusEl.textContent = `Uploading to cloud... ${(file.size/1024/1024).toFixed(1)}MB`;
+      const res = await fetch(`/api/upload?filename=${encodeURIComponent(filename)}`, {
+        method: 'POST',
+        body: file,
+        headers: token ? {Authorization: `Bearer ${token}`} : {}
+      });
+      if(!res.ok){
+        const errText = await res.text();
+        throw new Error(errText);
+      }
+      const blob = await res.json();
+      const publicUrl = blob.url;
+      statusEl.textContent = 'Saving to database...';
+      // 2. Save to NeonDB
+      const saveRes = await fetch('/api/songs', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', Authorization: token ? `Bearer ${token}` : ''},
+        body: JSON.stringify({
+          title: file.name.replace(/\.mp3$/i,'').replace(/\.m4a$/i,''),
+          artist: JSON.parse(localStorage.getItem('lpplayer_user')||'{}').display_name || 'My Upload',
+          url: publicUrl,
+          size: file.size
+        })
+      });
+      if(!saveRes.ok){
+        const e = await saveRes.text();
+        throw new Error('DB save failed: '+e);
+      }
+      statusEl.textContent = '✅ Saved! Visible on all devices!';
+      // Refresh songs list
+      setTimeout(()=>{ window.location.reload(); }, 800);
+      return publicUrl;
+    }catch(err){
+      console.error('Cross-device upload failed, fallback to local', err);
+      statusEl.textContent = '⚠️ Cloud failed, saving locally only: ' + err.message;
+      // Fallback local
+      const url = URL.createObjectURL(file);
+      const songs = JSON.parse(localStorage.getItem('lpplayer_songs')||'[]');
+      songs.unshift({id: Math.random().toString(36).slice(2), title: file.name, artist:'Local', url, file_size: file.size, created_at: new Date().toISOString()});
+      localStorage.setItem('lpplayer_songs', JSON.stringify(songs));
+      return url;
+    }
+  };
+})();
+</script>
 </body>
+
 </html>

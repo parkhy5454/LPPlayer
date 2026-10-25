@@ -1,15 +1,8 @@
 {
-  "name": "LPPlayer",
+  "name": "LPPlayer Cross Device",
   "short_name": "LPPlayer",
   "display": "standalone",
   "background_color": "#000",
   "theme_color": "#1DB954",
-  "start_url": "./",
-  "icons": [
-    {
-      "src": "https://cdn-icons-png.flaticon.com/512/138/138406.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
+  "start_url": "./"
 }

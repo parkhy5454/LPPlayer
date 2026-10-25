@@ -1,6 +1,7 @@
 {
-  "name": "lpplayer-working-fix",
-  "version": "4.1.0",
+  "name": "lpplayer-cross-device",
+  "version": "5.0.0",
+  "type": "module",
   "dependencies": {
     "@neondatabase/serverless": "^0.10.0",
     "@vercel/blob": "^0.23.0",

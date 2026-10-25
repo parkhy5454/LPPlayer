@@ -1,10 +1,11 @@
-# LPPlayer Working Fix v4.1
+# LPPlayer Cross-Device Final
 
-Fixes:
-- Audio plays with SoundHelix mp3s
-- Vinyl spins CSS animation
-- Upload works with ObjectURL + Vercel Blob
-- Bilingual EN/KO toggle top-right
+Fix: upload actually saves to Vercel Blob + NeonDB so phone sees laptop upload
 
-Deploy: GitHub upload -> Vercel auto redeploy
-Test: Play song, vinyl spin, upload mp3, lang toggle
+1. Upload API: put to Blob with public URL
+2. Songs API: save URL to Neon, GET returns all songs
+3. Frontend: calls /api/upload then /api/songs then reload
+
+Test:
+- Laptop upload mp3 -> Network tab /api/upload 200 -> Blob URL
+- Phone refresh -> GET /api/songs -> sees new song
