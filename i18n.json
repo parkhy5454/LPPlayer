@@ -1,0 +1,24 @@
+{
+  "supported": [
+    "ko",
+    "en"
+  ],
+  "default": "ko",
+  "toggleButton": "top-right",
+  "storage": "localStorage lp_lang",
+  "keys": [
+    "home",
+    "search",
+    "library",
+    "upload",
+    "profile",
+    "mixtape",
+    "forYou",
+    "recent",
+    "searchPlaceholder",
+    "uploadTitle",
+    "login",
+    "signup",
+    "adminBtn"
+  ]
+}
