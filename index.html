@@ -264,6 +264,16 @@
     }
     .lock-card .err { color: var(--accent-2); }
 
+    .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .seg-btn {
+      min-height: var(--tap); border: 0; border-radius: 12px;
+      background: var(--surface-2); color: var(--fg); font-weight: 600;
+      transition: transform .08s ease;
+    }
+    .seg-btn.on { background: var(--accent); color: #000; }
+    .btn-secondary { background: var(--surface-2); color: var(--fg); font-weight: 600; }
+    .account-email { color: var(--muted); margin: 0 0 12px; overflow-wrap: anywhere; }
+
     /* ---------- toast ---------- */
     .toast {
       position: absolute; left: 16px; right: 16px;
@@ -344,6 +354,11 @@
           </div>
         </div>
         <div class="card">
+          <h2 data-i18n="account">계정</h2>
+          <p class="account-email" id="accountEmail"></p>
+          <button class="btn btn-secondary" id="logoutBtn" type="button" data-i18n="logout">로그아웃</button>
+        </div>
+        <div class="card">
           <h2 data-i18n="install">홈 화면에 설치</h2>
           <button class="btn" id="installBtn" type="button" hidden data-i18n="installBtn">설치</button>
           <p id="iosHint" hidden data-i18n="iosHint">Safari 하단의 공유 버튼 → "홈 화면에 추가"를 누르세요.</p>
@@ -406,10 +421,16 @@
   <div class="lock" id="lock" hidden>
     <form class="lock-card" id="lockForm" autocomplete="on">
       <h2>LPPlayer</h2>
-      <input type="password" id="lockInput" name="password" autocomplete="current-password"
-             autocapitalize="off" autocorrect="off" spellcheck="false" required>
-      <p class="err" id="lockErr" hidden data-i18n="wrongKey">비밀번호가 맞지 않습니다</p>
-      <button class="btn" type="submit" data-i18n="enter">들어가기</button>
+      <div class="seg">
+        <button class="seg-btn on" type="button" data-mode="login" data-i18n="tabLogin">로그인</button>
+        <button class="seg-btn" type="button" data-mode="signup" data-i18n="tabSignup">회원가입</button>
+      </div>
+      <input type="email" id="authEmail" name="email" autocomplete="email" inputmode="email"
+             autocapitalize="off" autocorrect="off" spellcheck="false" data-i18n-ph="emailPh" placeholder="이메일" required>
+      <input type="password" id="authPw" name="password" autocomplete="current-password"
+             data-i18n-ph="passwordPh" placeholder="비밀번호 (8자 이상)" required>
+      <p class="err" id="lockErr" hidden></p>
+      <button class="btn" type="submit" id="authSubmit">로그인</button>
     </form>
   </div>
 
@@ -426,6 +447,8 @@
       ko: {
         tabHome: '홈', tabLib: '보관함', tabUpload: '업로드', tabSettings: '설정',
         uploadTitle: '파일 업로드',
+        tabLogin: '로그인', tabSignup: '회원가입', emailPh: '이메일', passwordPh: '비밀번호 (8자 이상)',
+        account: '계정', logout: '로그아웃', sessionEnded: '다시 로그인해 주세요',
         nothing: '재생 중인 곡 없음',
         noSongs: '아직 곡이 없습니다. 업로드 탭에서 파일을 추가하세요.',
         loadFail: '곡 목록을 불러오지 못했습니다',
@@ -442,13 +465,13 @@
         iosHint: 'Safari 하단의 공유 버튼 → "홈 화면에 추가"를 누르세요.',
         rotate: '세로 모드로 돌려주세요',
         playFail: '재생할 수 없는 파일입니다',
-        wrongKey: '비밀번호가 맞지 않습니다',
-        enter: '들어가기',
         tooBig: '500MB를 넘는 파일입니다'
       },
       en: {
         tabHome: 'Home', tabLib: 'Library', tabUpload: 'Upload', tabSettings: 'Settings',
         uploadTitle: 'Upload files',
+        tabLogin: 'Log in', tabSignup: 'Sign up', emailPh: 'Email', passwordPh: 'Password (8+ characters)',
+        account: 'Account', logout: 'Log out', sessionEnded: 'Please log in again',
         nothing: 'Nothing playing',
         noSongs: 'No tracks yet. Add files in the Upload tab.',
         loadFail: 'Could not load your library',
@@ -465,8 +488,6 @@
         iosHint: 'Tap the Share button in Safari, then "Add to Home Screen".',
         rotate: 'Please rotate to portrait',
         playFail: 'This file cannot be played',
-        wrongKey: 'Wrong password',
-        enter: 'Enter',
         tooBig: 'File is larger than 500 MB'
       }
     };
@@ -493,20 +514,43 @@
       for (const c of children) n.append(c instanceof Node ? c : document.createTextNode(String(c)));
       return n;
     }
-    const KEY_NAME = 'lp_key';
-    const getKey = () => store.get(KEY_NAME) || '';
-    function showLock(wrong) {
-      $('#lockErr').hidden = !wrong;
+    const TOKEN_NAME = 'lp_token', EMAIL_NAME = 'lp_email';
+    const getToken = () => store.get(TOKEN_NAME) || '';
+    let authMode = 'login';
+    function showAuth(message) {
+      $('#lockErr').textContent = message || '';
+      $('#lockErr').hidden = !message;
       $('#lock').hidden = false;
-      setTimeout(() => $('#lockInput').focus(), 50);
+      setTimeout(() => $('#authEmail').focus(), 50);
+    }
+    function setAuthMode(m) {
+      authMode = m;
+      document.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
+      $('#authSubmit').textContent = T(m === 'login' ? 'tabLogin' : 'tabSignup');
+      $('#authPw').setAttribute('autocomplete', m === 'login' ? 'current-password' : 'new-password');
+    }
+    function renderAccount() { $('#accountEmail').textContent = store.get(EMAIL_NAME) || ''; }
+    function endSession(message) {
+      store.set(TOKEN_NAME, '');
+      store.set(EMAIL_NAME, '');
+      songs = [];
+      idx = -1;
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      renderLibrary();
+      updatePlayer();
+      renderAccount();
+      showAuth(message);
     }
     async function api(path, opts = {}) {
-      const headers = { ...(opts.headers || {}), 'x-app-key': getKey() };
+      const headers = { ...(opts.headers || {}) };
+      const token = getToken();
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const r = await fetch(path, { ...opts, headers });
       const data = await r.json().catch(() => ({}));
       if (r.status === 401) {
-        store.set(KEY_NAME, '');
-        showLock(true);
+        endSession(T('sessionEnded'));
         throw new Error('unauthorized');
       }
       if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
@@ -738,7 +782,7 @@
       const blob = await upload(pathname, file, {
         access: 'public',
         handleUploadUrl: '/api/blob-token',
-        clientPayload: JSON.stringify({ key: getKey() }),
+        clientPayload: JSON.stringify({ token: getToken() }),
         multipart: file.size > 50 * 1024 * 1024,   // split only big files
         contentType: mimeFor(file),
         onUploadProgress: (e) => onPct && onPct(Math.round(e.percentage))
@@ -777,7 +821,7 @@
           okCount++;
           row.set('ok', T('done'));
         } catch (e) {
-          if (e.message === 'unauthorized') { row.set('err', T('wrongKey')); break; }
+          if (e.message === 'unauthorized') { row.set('err', T('sessionEnded')); break; }
           row.set('err', `${T('uploadFail')}: ${e.message}`);
         }
       }
@@ -803,6 +847,8 @@
       $('#pickBtn').textContent = T('pickFiles');
       renderLibrary();
       updatePlayer();
+      document.querySelectorAll('[data-i18n-ph]').forEach((n) => { n.placeholder = T(n.dataset.i18nPh); });
+      setAuthMode(authMode);
     }
     document.querySelectorAll('.lang-btn').forEach((b) => b.addEventListener('click', () => {
       lang = b.dataset.lang;
@@ -855,18 +901,40 @@
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
-    $('#lockForm').addEventListener('submit', (e) => {
+    $('#lockForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const key = $('#lockInput').value.trim();
-      if (!key) return;
-      store.set(KEY_NAME, key);
-      $('#lockInput').value = '';
-      $('#lock').hidden = true;
-      loadSongs();
+      const email = $('#authEmail').value.trim();
+      const password = $('#authPw').value;
+      if (!email || !password) return;
+      $('#authSubmit').disabled = true;
+      try {
+        const r = await fetch(authMode === 'login' ? '/api/auth/login' : '/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+        store.set(TOKEN_NAME, data.token);
+        store.set(EMAIL_NAME, data.user.email);
+        $('#authPw').value = '';
+        $('#lockErr').hidden = true;
+        $('#lock').hidden = true;
+        renderAccount();
+        loadSongs();
+      } catch (err) {
+        $('#lockErr').textContent = err.message;
+        $('#lockErr').hidden = false;
+      } finally {
+        $('#authSubmit').disabled = false;
+      }
     });
+    document.querySelectorAll('.seg-btn').forEach((b) => b.addEventListener('click', () => setAuthMode(b.dataset.mode)));
+    $('#logoutBtn').addEventListener('click', () => endSession(''));
 
     applyLang();
-    if (getKey()) loadSongs(); else showLock(false);
+    renderAccount();
+    if (getToken()) loadSongs(); else showAuth('');
   })();
   </script>
 </body>

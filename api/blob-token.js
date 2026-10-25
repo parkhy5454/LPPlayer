@@ -1,8 +1,8 @@
 import { handleUpload } from '@vercel/blob/client';
-import { keyIsValid } from '../lib/auth.js';
+import { userFromToken, NOT_CONFIGURED } from '../lib/auth.js';
 
 // The browser uploads the file straight to Vercel Blob. This route only hands out a short-lived,
-// path-limited upload token after checking the app password. The file never passes through here,
+// path-limited upload token after checking the signed-in account. The file never passes through here,
 // so the 4.5 MB serverless body limit does not apply.
 const MAX_BYTES = 500 * 1024 * 1024;
 const SAFE_PATH = /^[A-Za-z0-9._-]{1,200}$/;
@@ -31,7 +31,9 @@ export default async function handler(req, res) {
       onBeforeGenerateToken: async (pathname, clientPayload) => {
         let payload = {};
         try { payload = JSON.parse(clientPayload || '{}'); } catch {}
-        if (!keyIsValid(payload.key)) throw new Error('unauthorized');
+        const who = userFromToken(payload.token);
+        if (who.error === 'not-configured') throw new Error(NOT_CONFIGURED);
+        if (who.error) throw new Error('unauthorized');
         if (!SAFE_PATH.test(pathname)) throw new Error('bad file name');
         return {
           allowedContentTypes: ['audio/*', 'video/*', 'application/octet-stream'],
@@ -43,7 +45,7 @@ export default async function handler(req, res) {
     });
     return res.status(200).json(json);
   } catch (e) {
-    const status = e.message === 'unauthorized' ? 401 : 400;
+    const status = e.message === 'unauthorized' ? 401 : e.message === NOT_CONFIGURED ? 500 : 400;
     return res.status(status).json({ error: e.message });
   }
 }
