@@ -1,7 +1,10 @@
-# LPPlayer Auth Admin Final
+# LPPlayer Working Fix v4.1
 
-Bottom tabs + Real Auth + Admin Dashboard
+Fixes:
+- Audio plays with SoundHelix mp3s
+- Vinyl spins CSS animation
+- Upload works with ObjectURL + Vercel Blob
+- Bilingual EN/KO toggle top-right
 
-1. GitHub upload
-2. Vercel auto deploy
-3. Test: register parkhy email -> Profile -> Admin Dashboard
+Deploy: GitHub upload -> Vercel auto redeploy
+Test: Play song, vinyl spin, upload mp3, lang toggle

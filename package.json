@@ -1,6 +1,6 @@
 {
-  "name": "lpplayer-auth-admin",
-  "version": "4.0.0",
+  "name": "lpplayer-working-fix",
+  "version": "4.1.0",
   "dependencies": {
     "@neondatabase/serverless": "^0.10.0",
     "@vercel/blob": "^0.23.0",
