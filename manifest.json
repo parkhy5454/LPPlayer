@@ -1,6 +1,6 @@
 {
-  "name": "MODIO Monetization",
-  "short_name": "MODIO",
+  "name": "LPPlayer - LP 감성 플레이어",
+  "short_name": "LPPlayer",
   "display": "standalone",
   "background_color": "#000",
   "theme_color": "#1DB954",
