@@ -2324,12 +2324,15 @@
       // a typed title only makes sense for a single file; several files keep their own names
       const titleOne = valid.length === 1 ? $('#titleInput').value.trim() || null : null;
 
+      // several files at a time: the network is the bottleneck, so a few parallel uploads finish much sooner
+      const CONCURRENCY = 3;
       let okCount = 0;
       let firstId = null;
-      for (let i = 0; i < valid.length; i++) {
-        const f = valid[i];
+      let nextIdx = 0;
+      let doneCount = 0;
+      let stopAll = false;
+      const uploadOneFile = async (f) => {
         const row = logRow(f.name);
-        $('#pickBtn').textContent = T('uploadProgress', i + 1, valid.length);
         try {
           const lrc = lrcs.get(baseName(f.name));
           const lyrics = lrc ? await lrc.text() : null;
@@ -2350,10 +2353,20 @@
           okCount++;
           row.set('ok', T('done'));
         } catch (e) {
-          if (e.message === 'unauthorized') { row.set('err', T('sessionEnded')); break; }
+          if (e.message === 'unauthorized') { row.set('err', T('sessionEnded')); stopAll = true; return; }
           row.set('err', `${T('uploadFail')}: ${e.message}`);
+        } finally {
+          doneCount++;
+          $('#pickBtn').textContent = T('uploadProgress', doneCount, valid.length);
         }
-      }
+      };
+      const worker = async () => {
+        while (!stopAll && nextIdx < valid.length) {
+          const f = valid[nextIdx++];
+          await uploadOneFile(f);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, valid.length) }, worker));
 
       $('#fileInput').value = '';
       $('#titleInput').value = '';
