@@ -9,5 +9,8 @@
         }
       ]
     }
+  ],
+  "crons": [
+    { "path": "/api/cron/letters", "schedule": "0 0 * * *" }
   ]
 }

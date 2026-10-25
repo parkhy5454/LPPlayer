@@ -521,6 +521,11 @@
       <!-- SETTINGS -->
       <section class="view" id="view-settings" aria-label="settings">
         <div class="card">
+          <h2 data-i18n="capsuleAlerts">📮 타임캡슐 알림</h2>
+          <p class="legal-note" data-i18n="pushHint">편지가 열리면 알려 드려요. 아이폰은 홈 화면에 추가한 뒤에 켤 수 있어요.</p>
+          <button class="btn" id="pushBtn" type="button" hidden></button>
+        </div>
+        <div class="card">
           <h2 data-i18n="language">언어</h2>
           <div class="lang-group">
             <button class="lang-btn" type="button" data-lang="ko" aria-pressed="false">한국어</button>
@@ -697,6 +702,7 @@
           <p class="letter-body" id="letterViewBody"></p>
           <div class="dlg-btns">
             <button class="row-btn" id="letterViewClose" type="button" data-i18n="close">닫기</button>
+            <button class="row-btn" id="letterShareBtn" type="button" data-i18n="letterShare">공유</button>
             <button class="btn" id="letterViewPlay" type="button" hidden></button>
           </div>
         </dialog>
@@ -719,6 +725,10 @@
         letterSaved: '타임캡슐에 넣었습니다', noSong: '곡 첨부 안 함', letterYears1: '1년 후 열기', letterYears5: '5년 후 열기',
         letterYears10: '10년 후 열기', letterPh: '그 해의 나에게 편지를 써 보세요', letterSubmit: '타임캡슐에 넣기',
         letterListTitle: '📮 타임캡슐', close: '닫기',
+        capsuleAlerts: '📮 타임캡슐 알림', pushHint: '편지가 열리면 알려 드려요. 아이폰은 홈 화면에 추가한 뒤에 켤 수 있어요.',
+        pushOn: '알림 켜기', pushOff: '알림 끄기', pushOnDone: '편지가 열리면 알려 드릴게요', pushOffDone: '알림을 껐습니다',
+        pushDenied: '알림 권한이 꺼져 있어요. 기기 설정에서 허용해 주세요', letterShare: '공유',
+        letterShareText: (y) => `LPPlayer에서 보낸 ${y}년의 편지`, letterSavedImg: '편지 이미지를 저장했습니다',
         selectMode: '선택', selectDone: '선택 끝', bulkEdit: (n) => `선택한 ${n}곡 수정`,
         bulkHint: '비워 둔 칸은 바꾸지 않습니다.', bulkSaved: (n) => `${n}곡을 수정했습니다`,
         legalUpload: '업로드하는 음원은 본인이 저작권을 가지고 있거나 사용 허락을 받은 것만 올려 주세요. 타인의 저작물을 무단으로 올리거나 공유하면 저작권법에 따라 책임을 질 수 있습니다.',
@@ -773,6 +783,10 @@
         letterSaved: 'Sealed in the time capsule', noSong: 'No song', letterYears1: 'Opens in 1 year', letterYears5: 'Opens in 5 years',
         letterYears10: 'Opens in 10 years', letterPh: 'Write to your past self', letterSubmit: 'Seal it',
         letterListTitle: '📮 Time capsule', close: 'Close',
+        capsuleAlerts: '📮 Time capsule alerts', pushHint: 'We will let you know when a letter opens. On iPhone, add the app to your Home Screen first.',
+        pushOn: 'Turn on alerts', pushOff: 'Turn off alerts', pushOnDone: 'We will tell you when a letter opens', pushOffDone: 'Alerts turned off',
+        pushDenied: 'Notifications are off for this app. Allow them in your device settings', letterShare: 'Share',
+        letterShareText: (y) => `A letter from ${y}, sent with LPPlayer`, letterSavedImg: 'Letter image saved',
         selectMode: 'Select', selectDone: 'Done', bulkEdit: (n) => `Edit ${n} songs`,
         bulkHint: 'Empty fields are left unchanged.', bulkSaved: (n) => `Updated ${n} songs`,
         legalUpload: 'Only upload music you own or have permission to use. Uploading or sharing copyrighted works of others without permission may violate copyright law.',
@@ -1182,6 +1196,7 @@
       }
     });
     function openLetter(l) {
+      viewingLetter = l;
       $('#letterViewTitle').textContent = T('letterViewTitle', l.year);
       $('#letterViewBody').textContent = l.content || '';
       const play = $('#letterViewPlay');
@@ -1218,6 +1233,106 @@
     $('#letterListClose').addEventListener('click', () => $('#letterListDlg').close());
     $('#letterViewClose').addEventListener('click', () => $('#letterViewDlg').close());
     applyCap();
+
+    /* ---------------- time capsule: share an opened letter as a picture ---------------- */
+    let viewingLetter = null;
+    function wrapLines(g, text, maxW) {
+      const out = [];
+      for (const para of String(text).split('\n')) {
+        let line = '';
+        for (const ch of para) {
+          if (line && g.measureText(line + ch).width > maxW) { out.push(line); line = ch; } else line += ch;
+        }
+        out.push(line);
+      }
+      return out;
+    }
+    function letterCard(l, songTitle) {
+      const W = 1080, H = 1350;
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const g = c.getContext('2d');
+      g.fillStyle = '#f4ead2';
+      g.fillRect(0, 0, W, H);
+      g.strokeStyle = '#c9b48a';
+      g.lineWidth = 12;
+      g.strokeRect(40, 40, W - 80, H - 80);
+      g.fillStyle = '#6b4f2a';
+      g.font = '600 48px sans-serif';
+      g.fillText('📮 TIME CAPSULE', 96, 130);
+      g.font = '800 180px serif';
+      g.fillText(String(l.year), 96, 330);
+      g.font = '44px serif';
+      g.fillStyle = '#3b2c18';
+      let y = 440;
+      for (const line of wrapLines(g, l.content || '', W - 192).slice(0, 20)) { g.fillText(line, 96, y); y += 64; }
+      if (songTitle) { g.font = '36px sans-serif'; g.fillStyle = '#6b4f2a'; g.fillText('♪ ' + songTitle, 96, H - 150); }
+      g.font = '28px sans-serif';
+      g.fillStyle = '#6b4f2a';
+      g.fillText('LPPlayer', 96, H - 96);
+      return new Promise((resolve) => c.toBlob(resolve, 'image/png'));
+    }
+    $('#letterShareBtn').addEventListener('click', async () => {
+      const l = viewingLetter;
+      if (!l) return;
+      const song = songs.find((s) => s.id === l.song_id);
+      const blob = await letterCard(l, song ? song.title : '');
+      if (!blob) return toast(T('loadFail'));
+      const file = new File([blob], `letter-${l.year}.png`, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: T('letterViewTitle', l.year), text: T('letterShareText', l.year) });
+          return;
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+        }
+      }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = file.name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      toast(T('letterSavedImg'));
+    });
+
+    /* ---------------- time capsule: push alerts ---------------- */
+    function b64ToBytes(b64) {
+      const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+      const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+      return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+    }
+    async function refreshPushBtn() {
+      const btn = $('#pushBtn');
+      if (!btn || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) { btn.hidden = true; return; }
+      let key = null;
+      try { key = (await api('/api/push')).publicKey; } catch {}
+      if (!key) { btn.hidden = true; return; }
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      btn.dataset.key = key;
+      btn.textContent = sub ? T('pushOff') : T('pushOn');
+      btn.hidden = false;
+    }
+    $('#pushBtn').addEventListener('click', async () => {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await api(`/api/push?endpoint=${encodeURIComponent(sub.endpoint)}`, { method: 'DELETE' });
+          await sub.unsubscribe();
+          toast(T('pushOffDone'));
+        } else {
+          if ((await Notification.requestPermission()) !== 'granted') return toast(T('pushDenied'));
+          const made = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes($('#pushBtn').dataset.key) });
+          const j = made.toJSON();
+          await api('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: j.endpoint, keys: j.keys }) });
+          toast(T('pushOnDone'));
+        }
+      } catch (err) {
+        if (err.message !== 'unauthorized') toast(`${T('loadFail')}: ${err.message}`);
+      }
+      refreshPushBtn();
+    });
 
     /* ---------------- year filter (Time Capsule) ---------------- */
     let yearFilter = '';
@@ -1945,7 +2060,7 @@
       });
       $('#main').scrollTop = 0;
       if (name === 'together') renderHostSongs();
-      if (name === 'settings') { loadAdmin(); loadAccount(); }
+      if (name === 'settings') { loadAdmin(); loadAccount(); refreshPushBtn(); }
       if (name === 'home') drawRing(ringTitle);
     }
     document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
