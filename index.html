@@ -1285,6 +1285,11 @@
       } catch {}   // offline: the card keeps what it showed last
     }
     document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => $(`#${b.dataset.close}`).close()));
+    // On iPhone, a tap on a dialog button while the keyboard is open first dismisses the keyboard, which can
+    // swallow the tap. Keeping focus where it is lets the first tap save or cancel; the click still fires.
+    document.querySelectorAll('dialog .dlg-btns button').forEach((b) => b.addEventListener('pointerdown', (e) => e.preventDefault()));
+    // the Return key on the keyboard submits the dialog form
+    document.querySelectorAll('dialog input').forEach((i) => { i.enterKeyHint = 'done'; });
 
     $('#editProfileBtn').addEventListener('click', () => {
       $('#profName').value = accountInfo.name;
