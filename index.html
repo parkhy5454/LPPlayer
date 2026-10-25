@@ -145,6 +145,11 @@
     .room-move { min-width: var(--tap); min-height: var(--tap); border: 1px solid var(--muted); border-radius: 10px; background: transparent; }
     .chip.on { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
     .room-code { font-size: 44px; font-weight: 800; letter-spacing: .12em; text-align: center; margin: 4px 0 12px; }
+    .lydlg { width: min(92vw, 380px); border: 0; border-radius: 16px; padding: 18px; background: var(--surface); color: inherit; }
+    .lydlg::backdrop { background: rgba(0, 0, 0, .6); }
+    .lydlg h3 { margin: 0 0 4px; }
+    .lydlg .hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+    .lydlg .dlg-btns { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 14px; }
     .avatars { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 12px; }
     .avatar { width: var(--tap); height: var(--tap); border-radius: 50%; background: var(--accent); color: #000; display: grid; place-items: center; font-weight: 800; }
     .reacts { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; }
@@ -377,6 +382,18 @@
         </div>
         <div class="list" id="list"></div>
         <input class="sr-only" id="lrcInput" type="file" accept=".lrc,text/plain">
+        <dialog class="lydlg" id="lyDlg">
+          <form id="lyForm">
+            <h3 data-i18n="findLyricsTitle">가사 찾기</h3>
+            <input class="field" id="lyTitle" type="text" maxlength="200" data-i18n-ph="titlePh" placeholder="제목">
+            <input class="field" id="lyArtist" type="text" maxlength="200" data-i18n-ph="artistPh" placeholder="아티스트 (선택)">
+            <p class="hint" data-i18n="findLyricsHint">고친 제목과 가수로 다시 찾을 수 있어요</p>
+            <div class="dlg-btns">
+              <button class="row-btn" id="lyCancel" type="button" data-i18n="lyCancel">취소</button>
+              <button class="btn" type="submit" data-i18n="findLyrics">찾기</button>
+            </div>
+          </form>
+        </dialog>
       </section>
 
       <!-- UPLOAD -->
@@ -555,7 +572,10 @@
         share: '코드 공유', copied: '코드를 복사했습니다', shareText: 'LPPlayer 함께 듣기 코드', leaveRoom: '방 나가기',
         roomEnded: '방이 종료되었습니다', hostOnly: '방장만 조작할 수 있습니다', queueAdd: '다음 곡에 추가',
         queueTitle: '내 곡', queueNext: '다음 곡', tapToPlay: '화면을 눌러 재생을 시작하세요',
-        lyricsBtn: '가사', addLyrics: '가사 추가', lyricsSaved: '가사를 저장했습니다'
+        lyricsBtn: '가사', addLyrics: '가사 추가', lyricsSaved: '가사를 저장했습니다',
+        findLyrics: '찾기', findLyricsTitle: '가사 찾기', findLyricsHint: '고친 제목과 가수로 다시 찾을 수 있어요',
+        lyCancel: '취소', lyricsFound: '가사를 찾았습니다', lyricsNone: '이 곡의 가사를 찾지 못했습니다',
+        lyricsHave: '이미 가사가 있습니다'
       },
       en: {
         tabHome: 'Home', tabLib: 'Library', tabUpload: 'Upload', tabSettings: 'Me', searchPh: 'Search (title, artist)',
@@ -585,7 +605,10 @@
         share: 'Share code', copied: 'Code copied', shareText: 'Listen together on LPPlayer, code', leaveRoom: 'Leave room',
         roomEnded: 'The room has ended', hostOnly: 'Only the host can control playback', queueAdd: 'Add to next',
         queueTitle: 'My tracks', queueNext: 'Up next', tapToPlay: 'Tap the screen to start playing',
-        lyricsBtn: 'Lyrics', addLyrics: 'Add lyrics', lyricsSaved: 'Lyrics saved'
+        lyricsBtn: 'Lyrics', addLyrics: 'Add lyrics', lyricsSaved: 'Lyrics saved',
+        findLyrics: 'Find', findLyricsTitle: 'Find lyrics', findLyricsHint: 'Fix the title or artist and search again',
+        lyCancel: 'Cancel', lyricsFound: 'Lyrics found', lyricsNone: 'No lyrics found for this song',
+        lyricsHave: 'This song already has lyrics'
       }
     };
 
@@ -713,7 +736,14 @@
         lyr.addEventListener('click', () => { pendingLyricsId = s.id; $('#lrcInput').click(); });
         const del = el('button', { class: 'del', type: 'button', 'aria-label': T('delete') }, '✕');
         del.addEventListener('click', () => removeSong(s.id));
-        list.append(el('div', { class: 'row' + (i === idx ? ' playing' : '') }, main, lyr, del));
+        const kids = [main];
+        if (!s.lyrics) {
+          const find = el('button', { class: 'row-btn', type: 'button' }, T('findLyrics'));
+          find.addEventListener('click', () => openFind(s));
+          kids.push(find);
+        }
+        kids.push(lyr, del);
+        list.append(el('div', { class: 'row' + (i === idx ? ' playing' : '') }, ...kids));
       });
     }
 
@@ -1001,6 +1031,58 @@
       }
     });
 
+    /* ---------------- automatic lyrics (LRCLIB, looked up on the server) ---------------- */
+    const lyricsTried = new Set();   // songs already tried this session, so a miss is not retried on every play
+    // saves the lyrics on the song only when it has none; a user's own .lrc is never replaced
+    async function fetchLyrics(s, title, artist, duration) {
+      const q = new URLSearchParams({ title, artist, duration: String(Math.round(duration) || 0) });
+      const r = await api(`/api/lyrics?${q}`);
+      if (!r.found) return false;
+      await api(`/api/songs?id=${encodeURIComponent(s.id)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lyrics: r.synced })
+      });
+      s.lyrics = r.synced;
+      return true;
+    }
+    async function autoLyrics(s) {
+      if (!s || s.lyrics || lyricsTried.has(s.id)) return;
+      lyricsTried.add(s.id);
+      try {
+        if (await fetchLyrics(s, s.title || '', s.artist || '', audio.duration) && songs[idx] === s) {
+          setLyrics(s);
+          toast(T('lyricsFound'));
+        }
+      } catch {}   // silent: the user can still search by hand from the library
+    }
+    let findSong = null;
+    function openFind(s) {
+      if (s.lyrics) return toast(T('lyricsHave'));
+      findSong = s;
+      $('#lyTitle').value = s.title || '';
+      $('#lyArtist').value = s.artist || '';
+      $('#lyDlg').showModal();
+    }
+    $('#lyCancel').addEventListener('click', () => $('#lyDlg').close());
+    $('#lyForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const s = findSong;
+      const title = $('#lyTitle').value.trim();
+      $('#lyDlg').close();
+      if (!s || !title) return;
+      try {
+        const current = songs[idx] === s;
+        if (!await fetchLyrics(s, title, $('#lyArtist').value.trim(), current ? audio.duration : 0)) {
+          return toast(T('lyricsNone'));
+        }
+        if (current) setLyrics(s);
+        renderLibrary();
+        toast(T('lyricsSaved'));
+      } catch (err) {
+        toast(err.message);
+      }
+    });
+
     /* ---------------- playback ---------------- */
     function playIndex(i) {
       if (!songs.length) return;
@@ -1090,6 +1172,7 @@
     audio.addEventListener('loadedmetadata', () => {
       $('#tDur').textContent = fmt(audio.duration);
       if (room) syncRoom();
+      else if (idx >= 0) autoLyrics(songs[idx]);   // the length is known now, which makes the match exact
     });
     audio.addEventListener('timeupdate', () => {
       $('#tCur').textContent = fmt(audio.currentTime);
