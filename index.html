@@ -126,6 +126,22 @@
     @media (prefers-reduced-motion: reduce) { .vinyl.spin { animation: none; } }
     .np-big { font-size: 20px; font-weight: 700; margin: 0 0 4px; overflow-wrap: anywhere; }
     .np-sub { color: var(--muted); margin: 0; }
+    .lyrics { min-height: 84px; margin: 8px 8px 0; text-align: center; }
+    .lyrics[hidden] { display: none; }
+    .lyrics p { margin: 2px 0; line-height: 1.35; color: var(--muted); font-size: 16px; overflow-wrap: anywhere; }
+    .lyrics .cur { color: var(--accent); font-size: 19px; font-weight: 700; }
+    /* short phones: smaller disc so the three lyric lines fit above the player */
+    @media (max-height: 760px) {
+      .vinyl { width: min(46vw, 200px); height: min(46vw, 200px); margin-bottom: 8px; }
+    }
+    .chips { display: flex; gap: 8px; overflow-x: auto; padding: 0 0 12px; scrollbar-width: none; }
+    .chips[hidden] { display: none; }
+    .chips::-webkit-scrollbar { display: none; }
+    .chip { flex: none; min-height: var(--tap); padding: 0 16px; border-radius: 999px; border: 1px solid var(--muted); background: transparent; color: inherit; font-size: 16px; }
+    .chip.on { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
+    .field { display: block; width: 100%; box-sizing: border-box; min-height: var(--tap); margin: 10px 0 0; padding: 0 14px; border-radius: 12px; border: 1px solid var(--muted); background: transparent; color: inherit; font-size: 16px; }
+    body.privacy .t, body.privacy .a, body.privacy .np-title, body.privacy .np-artist,
+    body.privacy .np-big, body.privacy .np-sub, body.privacy .lyrics { filter: blur(6px); user-select: none; }
 
     /* ---------- player bar (one-hand zone) ---------- */
     .player {
@@ -329,11 +345,17 @@
           <div class="vinyl paused" id="vinyl"><div class="label">LP</div></div>
           <p class="np-big" id="bigTitle">—</p>
           <p class="np-sub" id="bigArtist"></p>
+          <div class="lyrics" id="lyrics" hidden>
+            <p id="lyPrev"></p>
+            <p class="cur" id="lyCur"></p>
+            <p id="lyNext"></p>
+          </div>
         </div>
       </section>
 
       <!-- LIBRARY -->
       <section class="view" id="view-library" aria-label="library">
+        <div class="chips" id="yearChips" hidden></div>
         <div class="list" id="list"></div>
       </section>
 
@@ -341,9 +363,11 @@
       <section class="view" id="view-upload" aria-label="upload">
         <div class="card">
           <h2 data-i18n="uploadTitle">파일 업로드</h2>
+          <input class="field" id="yearInput" type="number" inputmode="numeric" min="1900" max="2100"
+                 data-i18n-ph="yearPh" placeholder="연도 (선택)">
           <button class="btn" id="pickBtn" type="button" data-i18n="pickFiles">파일 선택 (여러 개 가능)</button>
           <input class="sr-only" id="fileInput" type="file" multiple
-                 accept="audio/*,video/*,.mp3,.m4a,.wav,.flac,.aac,.ogg,.opus,.mp4">
+                 accept="audio/*,video/*,.mp3,.m4a,.wav,.flac,.aac,.ogg,.opus,.mp4,.lrc">
           <ul class="log" id="uploadLog"></ul>
         </div>
       </section>
@@ -361,6 +385,10 @@
           <h2 data-i18n="account">계정</h2>
           <p class="account-email" id="accountEmail"></p>
           <button class="btn btn-secondary" id="logoutBtn" type="button" data-i18n="logout">로그아웃</button>
+        </div>
+        <div class="card">
+          <h2 data-i18n="privacyTitle">개인정보 보호 모드</h2>
+          <button class="btn btn-secondary" id="privacyBtn" type="button"></button>
         </div>
         <div class="card">
           <h2 data-i18n="install">홈 화면에 설치</h2>
@@ -468,7 +496,8 @@
         iosHint: 'Safari 하단의 공유 버튼 → "홈 화면에 추가"를 누르세요.',
         rotate: '세로 모드로 돌려주세요',
         playFail: '재생할 수 없는 파일입니다',
-        tooBig: '500MB를 넘는 파일입니다'
+        tooBig: '500MB를 넘는 파일입니다',
+        yearPh: '연도 (선택)', yearAll: '전체', privacyTitle: '개인정보 보호 모드', privacyOn: '켜짐', privacyOff: '꺼짐'
       },
       en: {
         tabHome: 'Home', tabLib: 'Library', tabUpload: 'Upload', tabSettings: 'Settings',
@@ -491,7 +520,8 @@
         iosHint: 'Tap the Share button in Safari, then "Add to Home Screen".',
         rotate: 'Please rotate to portrait',
         playFail: 'This file cannot be played',
-        tooBig: 'File is larger than 500 MB'
+        tooBig: 'File is larger than 500 MB',
+        yearPh: 'Year (optional)', yearAll: 'All', privacyTitle: 'Privacy mode', privacyOn: 'On', privacyOff: 'Off'
       }
     };
 
@@ -596,6 +626,7 @@
     }
 
     function renderLibrary() {
+      renderYearChips();
       const list = $('#list');
       $('#count').textContent = songs.length ? `${songs.length}` : '';
       list.textContent = '';
@@ -604,11 +635,13 @@
         return;
       }
       songs.forEach((s, i) => {
+        if (yearFilter && String(s.year || '') !== yearFilter) return;
+        const sub = [s.artist || T('artistUnknown'), s.year].filter(Boolean).join(' · ');
         const main = el('button', { class: 'row-main', type: 'button' },
           el('span', { class: 'row-idx' }, i === idx ? '♪' : String(i + 1)),
           el('span', { class: 'meta' },
             el('span', { class: 't' }, s.title || 'Untitled'),
-            el('span', { class: 'a' }, s.artist || T('artistUnknown'))));
+            el('span', { class: 'a' }, sub)));
         main.addEventListener('click', () => playIndex(i));
         const del = el('button', { class: 'del', type: 'button', 'aria-label': T('delete') }, '✕');
         del.addEventListener('click', () => removeSong(s.id));
@@ -632,6 +665,7 @@
         audio.removeAttribute('src');
         audio.load();
         idx = -1;
+        setLyrics(null);
       } else if (i < idx) {
         idx--;
       }
@@ -639,12 +673,74 @@
       updatePlayer();
     }
 
+    /* ---------------- lyrics (LRC: [mm:ss.xx] text) ---------------- */
+    let lyLines = [];
+    let lyIdx = -2;
+    function parseLrc(text) {
+      const out = [];
+      if (!text) return out;
+      for (const raw of String(text).split(/\r?\n/)) {
+        const stamps = [...raw.matchAll(/\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g)];
+        if (!stamps.length) continue;
+        const words = raw.replace(/\[[^\]]*\]/g, '').trim();
+        for (const m of stamps) {
+          const frac = m[3] ? Number('0.' + m[3]) : 0;
+          out.push({ t: Number(m[1]) * 60 + Number(m[2]) + frac, text: words });
+        }
+      }
+      return out.sort((a, b) => a.t - b.t);
+    }
+    function setLyrics(s) {
+      lyLines = parseLrc(s && s.lyrics);
+      lyIdx = -2;
+      $('#lyrics').hidden = !lyLines.length;
+      updateLyrics();
+    }
+    function updateLyrics() {
+      if (!lyLines.length) return;
+      const t = audio.currentTime;
+      let i = -1;
+      for (let k = 0; k < lyLines.length && lyLines[k].t <= t; k++) i = k;
+      if (i === lyIdx) return;
+      lyIdx = i;
+      $('#lyPrev').textContent = i > 0 ? lyLines[i - 1].text : '';
+      $('#lyCur').textContent = i >= 0 ? lyLines[i].text : '';
+      $('#lyNext').textContent = i + 1 < lyLines.length ? lyLines[i + 1].text : '';
+    }
+
+    /* ---------------- year filter (Time Capsule) ---------------- */
+    let yearFilter = '';
+    function renderYearChips() {
+      const box = $('#yearChips');
+      const years = [...new Set(songs.map((s) => s.year).filter(Boolean))].sort((a, b) => b - a);
+      box.textContent = '';
+      box.hidden = years.length === 0;
+      for (const y of ['', ...years]) {
+        const b = el('button', { class: 'chip' + (yearFilter === String(y) ? ' on' : ''), type: 'button' },
+          y === '' ? T('yearAll') : String(y));
+        b.addEventListener('click', () => { yearFilter = String(y); renderLibrary(); });
+        box.append(b);
+      }
+    }
+
+    /* ---------------- privacy mode (blurs titles on this device) ---------------- */
+    function applyPrivacy() {
+      const on = store.get('lp_privacy') === '1';
+      document.body.classList.toggle('privacy', on);
+      $('#privacyBtn').textContent = on ? T('privacyOn') : T('privacyOff');
+    }
+    $('#privacyBtn').addEventListener('click', () => {
+      store.set('lp_privacy', store.get('lp_privacy') === '1' ? '0' : '1');
+      applyPrivacy();
+    });
+
     /* ---------------- playback ---------------- */
     function playIndex(i) {
       if (!songs.length) return;
       idx = ((i % songs.length) + songs.length) % songs.length;
       const s = songs[idx];
       audio.src = s.url;
+      setLyrics(s);
       playAudio();
       if ('mediaSession' in navigator) {
         try { navigator.mediaSession.metadata = new MediaMetadata({ title: s.title || '', artist: s.artist || '' }); } catch {}
@@ -699,6 +795,7 @@
     });
     audio.addEventListener('timeupdate', () => {
       $('#tCur').textContent = fmt(audio.currentTime);
+      updateLyrics();
       if (audio.duration) $('#seek').value = Math.round((audio.currentTime / audio.duration) * 1000);
     });
     audio.addEventListener('error', () => { if (idx >= 0 && audio.error && audio.error.code !== 1) toast(T('playFail')); });
@@ -784,7 +881,7 @@
       const ext = (file.name.split('.').pop() || '').toLowerCase();
       return MIME_BY_EXT[ext] || 'application/octet-stream';
     }
-    async function uploadOne(file, onPct) {
+    async function uploadOne(file, onPct, meta = {}) {
       if (file.size > MAX_UPLOAD) throw new Error(T('tooBig'));
       // unique prefix: Blob is called with addRandomSuffix:false, so equal names would overwrite
       const safe = file.name.replace(/[^A-Za-z0-9._-]/g, '_').slice(-120);
@@ -829,7 +926,7 @@
       await api('/api/songs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, url: blob.url, size: file.size })
+        body: JSON.stringify({ title, url: blob.url, size: file.size, lyrics: meta.lyrics || null, year: meta.year || null })
       });
     }
 
@@ -842,11 +939,17 @@
       $('#pickBtn').disabled = true;
       $('#uploadLog').textContent = '';
 
+      // .lrc files are paired with the audio file that has the same name
+      const baseName = (n) => n.replace(/\.[^/.]+$/, '').toLowerCase();
+      const lrcs = new Map();
       const valid = [];
       for (const f of files) {
-        if (isAudio(f)) valid.push(f);
+        if (/\.lrc$/i.test(f.name)) lrcs.set(baseName(f.name), f);
+        else if (isAudio(f)) valid.push(f);
         else logRow(f.name).set('err', T('badType'));
       }
+      const yearVal = parseInt($('#yearInput').value, 10);
+      const year = yearVal >= 1900 && yearVal <= 2100 ? yearVal : null;
 
       let okCount = 0;
       for (let i = 0; i < valid.length; i++) {
@@ -854,7 +957,9 @@
         const row = logRow(f.name);
         $('#pickBtn').textContent = T('uploadProgress', i + 1, valid.length);
         try {
-          await uploadOne(f, (v) => row.set('', typeof v === 'number' ? `${v}%` : v));
+          const lrc = lrcs.get(baseName(f.name));
+          const lyrics = lrc ? await lrc.text() : null;
+          await uploadOne(f, (v) => row.set('', typeof v === 'number' ? `${v}%` : v), { lyrics, year });
           okCount++;
           row.set('ok', T('done'));
         } catch (e) {
@@ -891,6 +996,7 @@
       lang = b.dataset.lang;
       store.set('lp_lang', lang);
       applyLang();
+      applyPrivacy();
     }));
 
     let deferredPrompt = null;
@@ -970,6 +1076,7 @@
     $('#logoutBtn').addEventListener('click', () => endSession(''));
 
     applyLang();
+    applyPrivacy();
     renderAccount();
     if (getToken()) loadSongs(); else showAuth('');
   })();
