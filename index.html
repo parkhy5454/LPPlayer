@@ -1874,6 +1874,10 @@
       liftArm();
       idx = ((i % songs.length) + songs.length) % songs.length;
       const s = songs[idx];
+      // reset the player before a new song: an earlier error or pending load must not leak into the next one
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
       audio.src = s.url;
       setLyrics(s);
       playAudio();
@@ -2006,7 +2010,11 @@
       updateLyrics();
       if (audio.duration) $('#seek').value = Math.round((audio.currentTime / audio.duration) * 1000);
     });
-    audio.addEventListener('error', () => { if (idx >= 0 && audio.error && audio.error.code !== 1) toast(T('playFail')); });
+    audio.addEventListener('error', () => {
+      if (idx < 0 || !audio.error || audio.error.code === 1) return;
+      // the code helps find the cause: 2 network, 3 decode, 4 file type or address not supported
+      toast(`${T('playFail')} (${audio.error.code})`);
+    });
 
     $('#seek').addEventListener('input', (e) => {
       if (room || !audio.duration) return;   // in a room the slider only sends on release
