@@ -806,8 +806,7 @@
             'x-api-version': '7',
             'x-api-blob-request-id': `${Math.random().toString(16).slice(2)}:${Date.now()}`,
             'x-api-blob-request-attempt': '0',
-            'x-content-type': mimeFor(file),
-            'x-add-random-suffix': '0'
+            'x-content-type': mimeFor(file)
           },
           body: file,
           signal: ac.signal
