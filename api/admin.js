@@ -62,10 +62,10 @@ export default async function handler(req, res) {
     if (req.method === 'DELETE') {
       const id = String(req.query.id || '');
       if (!UUID.test(id)) return res.status(400).json({ error: 'valid id is required' });
-      const rows = await sql`DELETE FROM songs WHERE id = ${id} RETURNING url`;
+      const rows = await sql`DELETE FROM songs WHERE id = ${id} RETURNING url, cover_url`;
       if (!rows.length) return res.status(404).json({ error: 'not found' });
       // best effort: the row is already gone, the audio file is freed as well
-      try { await del(rows[0].url); } catch (e) { console.error('blob delete failed', e.message); }
+      try { await del([rows[0].url, rows[0].cover_url].filter(Boolean)); } catch (e) { console.error('blob delete failed', e.message); }
       return res.status(200).json({ ok: true });
     }
 

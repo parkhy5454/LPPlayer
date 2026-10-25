@@ -150,6 +150,9 @@
     .lydlg h3 { margin: 0 0 4px; }
     .lydlg .hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
     .lydlg .dlg-btns { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 14px; }
+    .grp { font-size: 14px; color: var(--accent); margin: 16px 4px 6px; }
+    .row-main .thumb { width: 44px; height: 44px; flex: none; border-radius: 8px; object-fit: cover; background: var(--surface); }
+    .vinyl .label { background-size: cover; background-position: center; }
     .adm-list { list-style: none; margin: 8px 0 14px; padding: 0; }
     .adm-list li { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--muted); }
     .adm-list .adm-name { display: block; overflow-wrap: anywhere; font-size: 15px; }
@@ -380,6 +383,7 @@
       <!-- LIBRARY -->
       <section class="view" id="view-library" aria-label="library">
         <input class="field" id="searchInput" type="search" data-i18n-ph="searchPh" placeholder="검색 (제목, 아티스트)">
+        <div class="chips" id="groupChips"></div>
         <div class="chips" id="yearChips" hidden></div>
         <div class="year-row">
           <input type="range" id="yearSlider" min="1970" max="2025" step="1" value="2000" aria-label="year">
@@ -387,6 +391,20 @@
         </div>
         <div class="list" id="list"></div>
         <input class="sr-only" id="lrcInput" type="file" accept=".lrc,text/plain">
+        <dialog class="lydlg" id="infoDlg">
+          <form id="infoForm">
+            <h3 data-i18n="editInfoTitle">곡 정보 수정</h3>
+            <input class="field" id="infoTitle" type="text" maxlength="80" data-i18n-ph="titlePh" placeholder="제목">
+            <input class="field" id="infoArtist" type="text" maxlength="80" data-i18n-ph="artistPh" placeholder="아티스트 (선택)">
+            <input class="field" id="infoAlbum" type="text" maxlength="120" data-i18n-ph="albumPh" placeholder="앨범 (선택)">
+            <input class="field" id="infoGenre" type="text" maxlength="60" data-i18n-ph="genrePh" placeholder="장르 (선택)">
+            <input class="field" id="infoYear" type="number" inputmode="numeric" min="1900" max="2100" data-i18n-ph="yearPh" placeholder="연도 (선택)">
+            <div class="dlg-btns">
+              <button class="row-btn" id="infoCancel" type="button" data-i18n="lyCancel">취소</button>
+              <button class="btn" type="submit" data-i18n="saveInfo">저장</button>
+            </div>
+          </form>
+        </dialog>
         <dialog class="lydlg" id="lyDlg">
           <form id="lyForm">
             <h3 data-i18n="findLyricsTitle">가사 찾기</h3>
@@ -587,6 +605,9 @@
         roomEnded: '방이 종료되었습니다', hostOnly: '방장만 조작할 수 있습니다', queueAdd: '다음 곡에 추가',
         queueTitle: '내 곡', queueNext: '다음 곡', tapToPlay: '화면을 눌러 재생을 시작하세요',
         lyricsBtn: '가사', addLyrics: '가사 추가', lyricsSaved: '가사를 저장했습니다',
+        groupNone: '묶지 않음', groupArtist: '아티스트별', groupAlbum: '앨범별', groupGenre: '장르별',
+        unknownGroup: '알 수 없음', editInfo: '정보 수정', editInfoTitle: '곡 정보 수정', albumPh: '앨범 (선택)',
+        genrePh: '장르 (선택)', saveInfo: '저장', infoSaved: '곡 정보를 저장했습니다',
         adminTitle: '관리자', adminUsers: '사용자', adminSongs: '곡 검색 · 삭제', adminSearchPh: '곡 제목 또는 가수',
         adminTotals: (u, s, mb) => `사용자 ${u}명 · 곡 ${s}개 · 용량 ${mb} MB`,
         suspend: '정지', restore: '해제', suspended: '정지됨', adminSaved: '변경을 저장했습니다',
@@ -624,6 +645,9 @@
         roomEnded: 'The room has ended', hostOnly: 'Only the host can control playback', queueAdd: 'Add to next',
         queueTitle: 'My tracks', queueNext: 'Up next', tapToPlay: 'Tap the screen to start playing',
         lyricsBtn: 'Lyrics', addLyrics: 'Add lyrics', lyricsSaved: 'Lyrics saved',
+        groupNone: 'No grouping', groupArtist: 'By artist', groupAlbum: 'By album', groupGenre: 'By genre',
+        unknownGroup: 'Unknown', editInfo: 'Edit info', editInfoTitle: 'Edit song info', albumPh: 'Album (optional)',
+        genrePh: 'Genre (optional)', saveInfo: 'Save', infoSaved: 'Song info saved',
         adminTitle: 'Admin', adminUsers: 'Users', adminSongs: 'Search & delete songs', adminSearchPh: 'Song title or artist',
         adminTotals: (u, s, mb) => `${u} users · ${s} songs · ${mb} MB`,
         suspend: 'Suspend', restore: 'Restore', suspended: 'Suspended', adminSaved: 'Change saved',
@@ -734,8 +758,48 @@
       updatePlayer();
     }
 
+    let groupBy = '';   // '', 'artist', 'album' or 'genre'
+    function renderGroupChips() {
+      const box = $('#groupChips');
+      box.textContent = '';
+      for (const [k, label] of [['', T('groupNone')], ['artist', T('groupArtist')], ['album', T('groupAlbum')], ['genre', T('groupGenre')]]) {
+        const b = el('button', { class: 'chip' + (groupBy === k ? ' on' : ''), type: 'button' }, label);
+        b.addEventListener('click', () => { groupBy = k; renderLibrary(); });
+        box.append(b);
+      }
+    }
+    function groupKey(s) {
+      const v = groupBy === 'album' ? s.album : groupBy === 'genre' ? s.genre : s.artist;
+      return v || T('unknownGroup');
+    }
+    function songRow(s, i) {
+      const sub = [s.artist || T('artistUnknown'), s.year].filter(Boolean).join(' · ');
+      const lead = s.cover_url
+        ? el('img', { class: 'thumb', src: s.cover_url, alt: '', loading: 'lazy' })
+        : el('span', { class: 'row-idx' }, i === idx ? '♪' : String(i + 1));
+      const main = el('button', { class: 'row-main', type: 'button' }, lead,
+        el('span', { class: 'meta' },
+          el('span', { class: 't' }, s.title || 'Untitled'),
+          el('span', { class: 'a' }, sub)));
+      main.addEventListener('click', () => playIndex(i));
+      const edit = el('button', { class: 'row-btn', type: 'button', 'aria-label': T('editInfo') }, '✎');
+      edit.addEventListener('click', () => openInfo(s));
+      const lyr = el('button', { class: 'row-btn', type: 'button', 'aria-label': T('addLyrics') }, T('lyricsBtn'));
+      lyr.addEventListener('click', () => { pendingLyricsId = s.id; $('#lrcInput').click(); });
+      const del = el('button', { class: 'del', type: 'button', 'aria-label': T('delete') }, '✕');
+      del.addEventListener('click', () => removeSong(s.id));
+      const kids = [main];
+      if (!s.lyrics) {
+        const find = el('button', { class: 'row-btn', type: 'button' }, T('findLyrics'));
+        find.addEventListener('click', () => openFind(s));
+        kids.push(find);
+      }
+      kids.push(edit, lyr, del);
+      return el('div', { class: 'row' + (i === idx ? ' playing' : '') }, ...kids);
+    }
     function renderLibrary() {
       renderYearChips();
+      renderGroupChips();
       const list = $('#list');
       $('#count').textContent = songs.length ? `${songs.length}` : '';
       list.textContent = '';
@@ -743,30 +807,23 @@
         list.append(el('p', { class: 'empty' }, T('noSongs')));
         return;
       }
+      const q = $('#searchInput').value.trim().toLowerCase();
+      const items = [];
       songs.forEach((s, i) => {
         if (yearFilter && String(s.year || '') !== yearFilter) return;
-        const q = $('#searchInput').value.trim().toLowerCase();
-        if (q && !`${s.title || ''} ${s.artist || ''}`.toLowerCase().includes(q)) return;
-        const sub = [s.artist || T('artistUnknown'), s.year].filter(Boolean).join(' · ');
-        const main = el('button', { class: 'row-main', type: 'button' },
-          el('span', { class: 'row-idx' }, i === idx ? '♪' : String(i + 1)),
-          el('span', { class: 'meta' },
-            el('span', { class: 't' }, s.title || 'Untitled'),
-            el('span', { class: 'a' }, sub)));
-        main.addEventListener('click', () => playIndex(i));
-        const lyr = el('button', { class: 'row-btn', type: 'button', 'aria-label': T('addLyrics') }, T('lyricsBtn'));
-        lyr.addEventListener('click', () => { pendingLyricsId = s.id; $('#lrcInput').click(); });
-        const del = el('button', { class: 'del', type: 'button', 'aria-label': T('delete') }, '✕');
-        del.addEventListener('click', () => removeSong(s.id));
-        const kids = [main];
-        if (!s.lyrics) {
-          const find = el('button', { class: 'row-btn', type: 'button' }, T('findLyrics'));
-          find.addEventListener('click', () => openFind(s));
-          kids.push(find);
-        }
-        kids.push(lyr, del);
-        list.append(el('div', { class: 'row' + (i === idx ? ' playing' : '') }, ...kids));
+        if (q && !`${s.title || ''} ${s.artist || ''} ${s.album || ''} ${s.genre || ''}`.toLowerCase().includes(q)) return;
+        items.push({ s, i });
       });
+      // grouped: alphabetical by group; the sort is stable, so newest-first is kept inside each group
+      if (groupBy) items.sort((a, b) => groupKey(a.s).localeCompare(groupKey(b.s), lang));
+      let last = null;
+      for (const { s, i } of items) {
+        if (groupBy) {
+          const key = groupKey(s);
+          if (key !== last) { list.append(el('h3', { class: 'grp' }, key)); last = key; }
+        }
+        list.append(songRow(s, i));
+      }
     }
 
     async function removeSong(id) {
@@ -1105,6 +1162,44 @@
       }
     });
 
+    /* ---------------- edit song info (title, artist, album, genre, year) ---------------- */
+    let infoSong = null;
+    function openInfo(s) {
+      infoSong = s;
+      $('#infoTitle').value = s.title || '';
+      $('#infoArtist').value = s.artist || '';
+      $('#infoAlbum').value = s.album || '';
+      $('#infoGenre').value = s.genre || '';
+      $('#infoYear').value = s.year || '';
+      $('#infoDlg').showModal();
+    }
+    $('#infoCancel').addEventListener('click', () => $('#infoDlg').close());
+    $('#infoForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const s = infoSong;
+      $('#infoDlg').close();
+      if (!s) return;
+      const y = parseInt($('#infoYear').value, 10);
+      const fields = {
+        title: $('#infoTitle').value.trim() || null,
+        artist: $('#infoArtist').value.trim() || null,
+        album: $('#infoAlbum').value.trim() || null,
+        genre: $('#infoGenre').value.trim() || null,
+        year: y >= 1900 && y <= 2100 ? y : null
+      };
+      try {
+        await api(`/api/songs?id=${encodeURIComponent(s.id)}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields)
+        });
+        Object.assign(s, fields);
+        renderLibrary();
+        if (songs[idx] === s) updatePlayer();
+        toast(T('infoSaved'));
+      } catch (err) {
+        toast(err.message);
+      }
+    });
+
     /* ---------------- admin (shown only to accounts listed in ADMIN_EMAILS) ---------------- */
     const fmtMB = (b) => (b / 1048576).toFixed(1);
     async function loadAdmin() {
@@ -1218,6 +1313,10 @@
       const playing = !!s && !audio.paused;
       $('#playIcon').innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
       $('#playBtn').setAttribute('aria-label', playing ? T('pause') : T('play'));
+      // the cover, when there is one, becomes the record label
+      const label = $('#vinyl .label');
+      label.style.backgroundImage = s && s.cover_url ? `url("${s.cover_url}")` : '';
+      label.textContent = s && s.cover_url ? '' : 'LP';
       $('#vinyl').classList.toggle('spin', playing);
       $('#vinyl').classList.toggle('paused', !playing);
       $('#prevBtn').setAttribute('aria-label', T('prev'));
@@ -1350,13 +1449,140 @@
       const ext = (file.name.split('.').pop() || '').toLowerCase();
       return MIME_BY_EXT[ext] || 'application/octet-stream';
     }
-    async function uploadOne(file, onPct, meta = {}) {
-      if (file.size > MAX_UPLOAD) throw new Error(T('tooBig'));
-      // unique prefix: Blob is called with addRandomSuffix:false, so equal names would overwrite
-      const safe = file.name.replace(/[^A-Za-z0-9._-]/g, '_').slice(-120);
-      const pathname = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`;
+    /* ---------------- reading mp3 tags in the browser (ID3v2 at the start, ID3v1 at the end) ---------------- */
+    const syncsafe = (b, o) => ((b[o] & 0x7f) << 21) | ((b[o + 1] & 0x7f) << 14) | ((b[o + 2] & 0x7f) << 7) | (b[o + 3] & 0x7f);
+    const be32 = (b, o) => ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
+    // text frames: first byte = encoding (0 Latin-1, 1 UTF-16 with BOM, 2 UTF-16BE, 3 UTF-8)
+    function decodeText(bytes) {
+      if (!bytes || !bytes.length) return '';
+      const enc = bytes[0];
+      const body = bytes.subarray(1);
+      let s = '';
+      try {
+        if (enc === 1) {
+          const bom = (body[0] === 0xff && body[1] === 0xfe) || (body[0] === 0xfe && body[1] === 0xff);
+          const le = body[0] === 0xff && body[1] === 0xfe;
+          s = new TextDecoder(le ? 'utf-16le' : 'utf-16be').decode(body.subarray(bom ? 2 : 0));
+        } else if (enc === 2) {
+          s = new TextDecoder('utf-16be').decode(body);
+        } else if (enc === 3) {
+          s = new TextDecoder('utf-8').decode(body);
+        } else {
+          // Latin-1 tags are often UTF-8 in practice; fall back to Western European text otherwise
+          try { s = new TextDecoder('utf-8', { fatal: true }).decode(body); }
+          catch { s = new TextDecoder('windows-1252').decode(body); }
+        }
+      } catch { return ''; }
+      return s.split('\0')[0].trim();   // several values may be separated by nulls; the first one is used
+    }
+    // index of the terminator (one zero byte, or two for UTF-16) at or after `from`
+    function nullEnd(b, from, wide) {
+      for (let k = from; k + (wide ? 1 : 0) < b.length; k += wide ? 2 : 1) {
+        if (b[k] === 0 && (!wide || b[k + 1] === 0)) return k;
+      }
+      return -1;
+    }
+    const FRAME_TO_FIELD = {
+      TIT2: 'title', TT2: 'title', TPE1: 'artist', TP1: 'artist', TALB: 'album', TAL: 'album',
+      TCON: 'genre', TCO: 'genre', TYER: 'year', TYE: 'year', TDRC: 'year'
+    };
+    function parseId3v2(b) {
+      const out = {};
+      const ver = b[3];
+      if (ver < 2 || ver > 4) return out;
+      const hdr = ver === 2 ? 6 : 10;
+      const idLen = ver === 2 ? 3 : 4;
+      const end = Math.min(b.length, 10 + syncsafe(b, 6));
+      let pos = 10;
+      if (b[5] & 0x40) pos += ver === 4 ? syncsafe(b, 10) : 4 + be32(b, 10);   // skip an extended header
+      while (pos + hdr <= end) {
+        const id = String.fromCharCode(...b.subarray(pos, pos + idLen));
+        if (!/^[A-Z0-9]{3,4}$/.test(id)) break;   // reached the padding at the end of the tag
+        const len = ver === 2 ? (b[pos + 3] << 16) | (b[pos + 4] << 8) | b[pos + 5]
+          : ver === 4 ? syncsafe(b, pos + 4) : be32(b, pos + 4);
+        const start = pos + hdr;
+        const data = b.subarray(start, Math.min(end, start + len));
+        pos = start + len;
+        if (len <= 0) continue;
+        const field = FRAME_TO_FIELD[id];
+        if (field) {
+          if (out[field]) continue;
+          let v = decodeText(data);
+          if (field === 'genre') {
+            v = v.replace(/^\(\d+\)/, '').trim();   // "(17)Rock" form
+            if (/^\d+$/.test(v)) v = '';            // plain numeric genre codes are not mapped
+          }
+          if (field === 'year') v = (v.match(/\d{4}/) || [''])[0];
+          if (v) out[field] = v;
+        } else if ((id === 'APIC' || id === 'PIC') && !out.picture) {
+          const wide = data[0] === 1 || data[0] === 2;
+          let p;
+          let mime;
+          if (id === 'APIC') {
+            const z = nullEnd(data, 1, false);
+            if (z < 0) continue;
+            mime = new TextDecoder('windows-1252').decode(data.subarray(1, z)).toLowerCase();
+            p = z + 1;
+          } else {   // PIC (ID3v2.2): 3-letter format
+            const fmt = new TextDecoder('windows-1252').decode(data.subarray(1, 4)).toUpperCase();
+            mime = fmt === 'PNG' ? 'image/png' : 'image/jpeg';
+            p = 4;
+          }
+          p += 1;   // picture type byte
+          const z = nullEnd(data, p, wide);   // end of the description
+          if (z < 0) continue;
+          const bytes = data.subarray(z + (wide ? 2 : 1));
+          if (/^image\/(jpeg|jpg|png)$/.test(mime)) out.picture = { mime: mime === 'image/png' ? 'image/png' : 'image/jpeg', bytes };
+        }
+      }
+      return out;
+    }
+    // cover art: shrink to 600 px and re-encode as JPEG so it stays small in Blob storage
+    async function shrinkCover(bytes, mime) {
+      try {
+        const bmp = await createImageBitmap(new Blob([bytes], { type: mime }));
+        const k = Math.min(1, 600 / Math.max(bmp.width, bmp.height));
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(bmp.width * k));
+        c.height = Math.max(1, Math.round(bmp.height * k));
+        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+        return await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.85));
+      } catch { return null; }
+    }
+    // returns { title, artist, album, genre, year, cover } where any field may be missing
+    async function readTags(file) {
+      const out = {};
+      try {
+        if (file.size >= 10) {
+          const head = new Uint8Array(await file.slice(0, 10).arrayBuffer());
+          if (head[0] === 0x49 && head[1] === 0x44 && head[2] === 0x33) {   // "ID3"
+            const size = syncsafe(head, 6);
+            if (size > 0 && size < 30 * 1024 * 1024) {
+              const tag = new Uint8Array(await file.slice(0, 10 + size).arrayBuffer());
+              Object.assign(out, parseId3v2(tag));
+            }
+          }
+        }
+        if (file.size >= 128) {
+          const t = new Uint8Array(await file.slice(file.size - 128).arrayBuffer());
+          if (t[0] === 0x54 && t[1] === 0x41 && t[2] === 0x47) {   // "TAG": ID3v1 at the very end
+            const txt = (a, b) => new TextDecoder('windows-1252').decode(t.subarray(a, b)).split('\0')[0].trim();
+            const v1 = { title: txt(3, 33), artist: txt(33, 63), album: txt(63, 93), year: (txt(93, 97).match(/\d{4}/) || [''])[0] };
+            for (const k of Object.keys(v1)) if (!out[k] && v1[k]) out[k] = v1[k];
+          }
+        }
+      } catch {}
+      let cover = null;
+      if (out.picture) cover = await shrinkCover(out.picture.bytes, out.picture.mime);
+      delete out.picture;
+      out.cover = cover;
+      return out;
+    }
+
+    // 1) our server checks the signed-in account and issues a short-lived upload token
+    // 2) the browser sends the file straight to Blob; a 3-minute limit stops a stalled transfer
+    async function putBlob(file, pathname, contentType) {
       const clientPayload = JSON.stringify({ token: getToken() });
-      // 1) our server checks the signed-in account and issues a short-lived upload token
       const tokRes = await fetch('/api/blob-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1364,7 +1590,6 @@
       });
       const tok = await tokRes.json().catch(() => ({}));
       if (!tokRes.ok || !tok.clientToken) throw new Error(tok.error || T('uploadFail'));
-      // 2) the browser sends the file straight to Blob; a 3-minute limit stops a stalled transfer
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), 180000);
       let putRes, putText;
@@ -1377,7 +1602,7 @@
             // same format the SDK uses: <store id from the token>:<time>:<random>
             'x-api-blob-request-id': `${tok.clientToken.split('_')[3] || ''}:${Date.now()}:${Math.random().toString(16).slice(2)}`,
             'x-api-blob-request-attempt': '0',
-            'x-content-type': mimeFor(file)
+            'x-content-type': contentType
           },
           body: file,
           signal: ac.signal
@@ -1388,7 +1613,22 @@
         throw err;
       } finally { clearTimeout(timer); }
       if (!putRes.ok) throw new Error(T('uploadFail'));
-      const blob = JSON.parse(putText);
+      return JSON.parse(putText);
+    }
+
+    async function uploadOne(file, onPct, meta = {}) {
+      if (file.size > MAX_UPLOAD) throw new Error(T('tooBig'));
+      // unique prefix: Blob is called with addRandomSuffix:false, so equal names would overwrite
+      const safe = file.name.replace(/[^A-Za-z0-9._-]/g, '_').slice(-120);
+      const pathname = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`;
+      const blob = await putBlob(file, pathname, mimeFor(file));
+      let coverUrl = null;
+      if (meta.cover) {
+        try {
+          const c = await putBlob(meta.cover, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-cover.jpg`, 'image/jpeg');
+          coverUrl = c.url;
+        } catch {}   // a cover that fails to upload never blocks the song itself
+      }
 
       const fromName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 80);
       const title = meta.title || fromName || 'Untitled';
@@ -1396,7 +1636,10 @@
       const saved = await api('/api/songs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, artist: meta.artist || null, url: blob.url, size: file.size, lyrics: meta.lyrics || null, year: meta.year || null })
+        body: JSON.stringify({
+          title, artist: meta.artist || null, album: meta.album || null, genre: meta.genre || null,
+          cover_url: coverUrl, url: blob.url, size: file.size, lyrics: meta.lyrics || null, year: meta.year || null
+        })
       });
       return saved.song;
     }
@@ -1434,8 +1677,18 @@
         try {
           const lrc = lrcs.get(baseName(f.name));
           const lyrics = lrc ? await lrc.text() : null;
-          const song = await uploadOne(f, (v) => row.set('', typeof v === 'number' ? `${v}%` : v),
-            { lyrics, year, artist, title: titleOne });
+          // typed values win; otherwise the file's own tags (title, artist, album, genre, year, cover) are used
+          const tags = await readTags(f);
+          const tagYear = parseInt(tags.year, 10);
+          const song = await uploadOne(f, (v) => row.set('', typeof v === 'number' ? `${v}%` : v), {
+            lyrics,
+            year: year || (tagYear >= 1900 && tagYear <= 2100 ? tagYear : null),
+            artist: artist || tags.artist || null,
+            title: titleOne || tags.title || null,
+            album: tags.album || null,
+            genre: tags.genre || null,
+            cover: tags.cover || null
+          });
           if (!firstId && song) firstId = song.id;
           okCount++;
           row.set('ok', T('done'));

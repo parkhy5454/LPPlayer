@@ -15,6 +15,7 @@ async function ensureTables(sql) {
   await sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS user_id UUID`;
   await sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS lyrics TEXT`;
   await sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS year INT`;
+  await sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS cover_url TEXT`;
   await sql`CREATE TABLE IF NOT EXISTS rooms (
     code TEXT PRIMARY KEY, host_id UUID NOT NULL, current_song_id UUID,
     position DOUBLE PRECISION NOT NULL DEFAULT 0, playing BOOLEAN NOT NULL DEFAULT false,
@@ -98,7 +99,7 @@ export default async function handler(req, res) {
                                FROM rooms WHERE code = ${code}`;
       let song = null;
       if (room.current_song_id) {
-        const s = await sql`SELECT id, title, artist, url, lyrics, year FROM songs WHERE id = ${room.current_song_id}`;
+        const s = await sql`SELECT id, title, artist, url, lyrics, year, cover_url FROM songs WHERE id = ${room.current_song_id}`;
         song = s[0] || null;
       }
       const members = await sql`SELECT email FROM room_members WHERE room_code = ${code} ORDER BY joined_at`;
