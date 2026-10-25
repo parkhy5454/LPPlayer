@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { del } from '@vercel/blob';
-import { userFromRequest, NOT_CONFIGURED } from '../lib/auth.js';
+import { userFromRequest, isSuspended, NOT_CONFIGURED } from '../lib/auth.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_LYRICS = 200000;   // characters
@@ -31,6 +31,7 @@ export default async function handler(req, res) {
   const sql = neon(process.env.DATABASE_URL);
 
   try {
+    if (await isSuspended(sql, userId)) return res.status(403).json({ error: '이용이 정지된 계정입니다' });
     await sql`CREATE TABLE IF NOT EXISTS songs (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       title TEXT,

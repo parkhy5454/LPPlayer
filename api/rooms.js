@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import { userFromRequest, NOT_CONFIGURED } from '../lib/auth.js';
+import { userFromRequest, isSuspended, NOT_CONFIGURED } from '../lib/auth.js';
 
 // Mixtape Together: one host controls playback, members follow the room state (polled every 2 s).
 // Positions are kept on the server clock (updated_at), so clients only compare server times.
@@ -52,6 +52,7 @@ export default async function handler(req, res) {
 
   try {
     await ensureTables(sql);
+    if (await isSuspended(sql, me)) return res.status(403).json({ error: '이용이 정지된 계정입니다' });
 
     // member check used by every room action; the host is always a member
     async function requireMember() {

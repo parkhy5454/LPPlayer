@@ -19,10 +19,13 @@ export default async function handler(req, res) {
     if (!email || !password) return res.status(400).json({ error: WRONG });
 
     const sql = neon(process.env.DATABASE_URL);
-    const rows = await sql`SELECT id, email, password_hash FROM users WHERE email = ${email} LIMIT 1`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended BOOLEAN NOT NULL DEFAULT false`;
+    const rows = await sql`SELECT id, email, password_hash, suspended FROM users WHERE email = ${email} LIMIT 1`;
     if (!rows.length) return res.status(401).json({ error: WRONG });
     const ok = await bcrypt.compare(password, rows[0].password_hash);
     if (!ok) return res.status(401).json({ error: WRONG });
+    // checked after the password, so the message does not reveal anything to someone who does not know it
+    if (rows[0].suspended) return res.status(403).json({ error: '이용이 정지된 계정입니다' });
 
     return res.status(200).json({ token: signToken(rows[0]), user: { id: rows[0].id, email: rows[0].email } });
   } catch (e) {

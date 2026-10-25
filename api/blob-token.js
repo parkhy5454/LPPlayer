@@ -1,5 +1,6 @@
 import { handleUpload } from '@vercel/blob/client';
-import { userFromToken, NOT_CONFIGURED } from '../lib/auth.js';
+import { neon } from '@neondatabase/serverless';
+import { userFromToken, isSuspended, NOT_CONFIGURED } from '../lib/auth.js';
 
 // The browser uploads the file straight to Vercel Blob. This route only hands out a short-lived,
 // path-limited upload token after checking the signed-in account. The file never passes through here,
@@ -35,6 +36,7 @@ export default async function handler(req, res) {
         const who = userFromToken(payload.token);
         if (who.error === 'not-configured') throw new Error(NOT_CONFIGURED);
         if (who.error) throw new Error('unauthorized');
+        if (await isSuspended(neon(process.env.DATABASE_URL), who.user.id)) throw new Error('suspended');
         if (!SAFE_PATH.test(pathname)) throw new Error('bad file name');
         return {
           allowedContentTypes: ['audio/*', 'video/*', 'application/octet-stream'],
@@ -46,7 +48,8 @@ export default async function handler(req, res) {
     });
     return res.status(200).json(json);
   } catch (e) {
-    const status = e.message === 'unauthorized' ? 401 : e.message === NOT_CONFIGURED ? 500 : 400;
+    const status = e.message === 'unauthorized' ? 401 : e.message === 'suspended' ? 403
+      : e.message === NOT_CONFIGURED ? 500 : 400;
     return res.status(status).json({ error: e.message });
   }
 }
