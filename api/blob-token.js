@@ -39,7 +39,7 @@ export default async function handler(req, res) {
         if (await isSuspended(neon(process.env.DATABASE_URL), who.user.id)) throw new Error('suspended');
         if (!SAFE_PATH.test(pathname)) throw new Error('bad file name');
         return {
-          allowedContentTypes: ['audio/*', 'video/*', 'application/octet-stream'],
+          allowedContentTypes: ['audio/*', 'video/*', 'image/*', 'application/octet-stream'],
           maximumSizeInBytes: MAX_BYTES,
           addRandomSuffix: false,
         };
