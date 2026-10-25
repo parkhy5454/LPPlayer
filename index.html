@@ -100,12 +100,14 @@
 
     /* ---------- vinyl ---------- */
     .stage { text-align: center; padding-top: 8px; }
+    .disc-box { position: relative; width: min(62vw, 280px); height: min(62vw, 280px); margin: 0 auto 16px; }
     .vinyl {
       will-change: transform;          /* GPU layer: smooth spin on phones */
       transform: translateZ(0);
-      width: min(62vw, 280px);
-      height: min(62vw, 280px);
-      margin: 0 auto 16px;
+      position: relative;
+      width: 100%;
+      height: 100%;
+      margin: 0;
       border-radius: 50%;
       display: grid;
       place-items: center;
@@ -118,17 +120,26 @@
       width: 38%; aspect-ratio: 1; border-radius: 50%;
       background: var(--accent); color: #000;
       display: grid; place-items: center;
-      font-weight: 700; font-size: 16px;
+      font-weight: 700; font-size: 32px;
     }
-    /* the playing song's title runs around the black groove area and turns with the record */
-    .vinyl { position: relative; }
-    .vinyl-text {
-      position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;
-      fill: #9a9a9a; font-size: 4px; font-weight: 600; letter-spacing: .03em;
+    /* the playing song's title runs around the black groove area; it is part of the record, so it turns with it */
+    .ring-text { position: absolute; inset: 0; pointer-events: none; }
+    .ring-slot { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+    .ring-slot span {
+      position: absolute; left: 0; top: 0; transform: translate(-50%, -50%);
+      font-size: var(--fs, 14px); line-height: 1; font-weight: 600; color: #9a9a9a;
     }
+    /* tonearm: rests off the record, moves onto the grooves while a song plays */
+    .tonearm { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .tonearm .arm-base { fill: #2a2a2a; stroke: #5a5a5a; stroke-width: .6; }
+    .tonearm line { stroke: #d6d6d6; stroke-width: 1.8; stroke-linecap: round; }
+    .tonearm rect { fill: #bdbdbd; }
+    .tonearm #armG { transform-box: view-box; transform-origin: 90px 8px; transform: rotate(-22deg); transition: transform .9s ease-in-out; }
+    .tonearm.down #armG { transform: rotate(14deg); }
     .vinyl.spin { animation: spin 1.8s linear infinite; }   /* 33 1/3 RPM = one turn every 1.8 s */
     .vinyl.paused { animation-play-state: paused; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    /* both ends are rotate() so the browser interpolates the angle; a "to"-only keyframe against translateZ(0) can end up as identity and never turn */
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) { .vinyl.spin { animation: none; } }
     .np-big { font-size: 20px; font-weight: 700; margin: 0 0 4px; overflow-wrap: anywhere; }
     .np-sub { color: var(--muted); margin: 0; }
@@ -138,7 +149,7 @@
     .lyrics .cur { color: var(--accent); font-size: 19px; font-weight: 700; }
     /* short phones: smaller disc so the three lyric lines fit above the player */
     @media (max-height: 760px) {
-      .vinyl { width: min(46vw, 200px); height: min(46vw, 200px); margin-bottom: 8px; }
+      .disc-box { width: min(46vw, 200px); height: min(46vw, 200px); margin-bottom: 8px; }
     }
     .chips { display: flex; gap: 8px; overflow-x: auto; padding: 0 0 12px; scrollbar-width: none; }
     .chips[hidden] { display: none; }
@@ -177,7 +188,7 @@
     @keyframes floatUp { to { transform: translateY(-180px); opacity: 0; } }
     .field { display: block; width: 100%; box-sizing: border-box; min-height: var(--tap); margin: 10px 0 0; padding: 0 14px; border-radius: 12px; border: 1px solid var(--muted); background: transparent; color: inherit; font-size: 16px; }
     body.privacy .t, body.privacy .a, body.privacy .np-title, body.privacy .np-artist,
-    body.privacy .np-big, body.privacy .np-sub, body.privacy .lyrics, body.privacy .vinyl-text { filter: blur(6px); user-select: none; }
+    body.privacy .np-big, body.privacy .np-sub, body.privacy .lyrics, body.privacy .ring-text { filter: blur(6px); user-select: none; }
 
     /* ---------- player bar (one-hand zone) ---------- */
     .player {
@@ -379,7 +390,7 @@
       <!-- HOME -->
       <section class="view active" id="view-home" aria-label="home">
         <div class="stage" id="stage">
-          <div class="vinyl paused" id="vinyl"><div class="label">LP</div><svg class="vinyl-text" viewBox="0 0 100 100" aria-hidden="true"><defs><path id="ringPath" d="M50,22 A28,28 0 1,1 50,78 A28,28 0 1,1 50,22"/></defs><text><textPath id="ringText" href="#ringPath"></textPath></text></svg></div>
+          <div class="disc-box"><div class="vinyl paused" id="vinyl"><div class="label">LP</div><div class="ring-text" id="ringText"></div></div><svg class="tonearm" id="tonearm" viewBox="0 0 100 100" aria-hidden="true"><circle class="arm-base" cx="90" cy="8" r="4.5"/><g id="armG"><line x1="90" y1="8" x2="90" y2="54"/><rect x="87.6" y="52" width="4.8" height="8" rx="1"/></g></svg></div>
           <p class="np-big" id="bigTitle">—</p>
           <p class="np-sub" id="bigArtist"></p>
           <div class="lyrics" id="lyrics" hidden>
@@ -1413,9 +1424,40 @@
       adminQTimer = setTimeout(loadAdminSongs, 300);
     });
 
+    /* ---------------- record: title ring and tonearm ---------------- */
+    let ringTitle = '';
+    // the title is laid out as single characters on a circle, so the whole ring is part of the record and turns with it
+    function drawRing(title) {
+      ringTitle = title;
+      const box = $('#ringText');
+      box.textContent = '';
+      if (!title) return;
+      const W = $('#vinyl').offsetWidth;
+      if (!W) return;   // hidden view: drawn again when the home view opens
+      const fs = W * 0.08;          // text is twice the earlier size
+      const R = W * 0.28;           // centre line of the text, between the label and the edge
+      const N = Math.max(8, Math.floor((2 * Math.PI * R) / (fs * 0.95)));
+      const unit = `${title}  ·  `;
+      const chars = Array.from(unit.repeat(Math.ceil(N / Array.from(unit).length) + 1)).slice(0, N);
+      box.style.setProperty('--fs', `${fs}px`);
+      chars.forEach((ch, i) => {
+        const slot = el('div', { class: 'ring-slot' }, el('span', {}, ch));
+        slot.style.transform = `rotate(${(360 * i) / N}deg) translateY(${-R}px)`;
+        box.append(slot);
+      });
+    }
+    window.addEventListener('resize', () => drawRing(ringTitle));
+
+    // tonearm: lowered onto the record when a song plays, lifted when a track ends or changes
+    const tonearm = $('#tonearm');
+    let armTimer = null;
+    function liftArm() { clearTimeout(armTimer); tonearm.classList.remove('down'); }
+    function lowerArm(delay) { clearTimeout(armTimer); armTimer = setTimeout(() => tonearm.classList.add('down'), delay); }
+
     /* ---------------- playback ---------------- */
     function playIndex(i) {
       if (!songs.length) return;
+      liftArm();
       idx = ((i % songs.length) + songs.length) % songs.length;
       const s = songs[idx];
       audio.src = s.url;
@@ -1469,8 +1511,8 @@
       $('#vinyl').classList.toggle('paused', !playing);
       $('#playIcon').innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
       $('#playBtn').setAttribute('aria-label', playing ? T('pause') : T('play'));
-      // the title is printed around the black groove area and turns with the record
-      $('#ringText').textContent = s ? `${s.title || 'Untitled'}  ·  `.repeat(4) : '';
+      drawRing(s ? (s.title || 'Untitled') : '');
+      if (!s) liftArm();
       $('#prevBtn').setAttribute('aria-label', T('prev'));
       $('#nextBtn').setAttribute('aria-label', T('next'));
       $('#prevBtn').disabled = !room && !songs.length;
@@ -1494,10 +1536,13 @@
     }
     audio.addEventListener('play', () => {
       if (audio.currentTime < 0.6) needleDrop();
+      // a new track: the arm is already up, so it waits a moment for the record to get going
+      lowerArm(tonearm.classList.contains('down') ? 0 : 900);
       updatePlayer();
     });
     audio.addEventListener('pause', updatePlayer);
     audio.addEventListener('ended', () => {
+      liftArm();
       if (room) { if (room.isHost) roomControl('next'); return; }   // in a room only the host advances
       next();
     });
@@ -1566,6 +1611,7 @@
       $('#main').scrollTop = 0;
       if (name === 'together') renderHostSongs();
       if (name === 'settings') { loadAdmin(); loadAccount(); }
+      if (name === 'home') drawRing(ringTitle);
     }
     document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
 
