@@ -102,7 +102,7 @@ export default async function handler(req, res) {
       }
       const members = await sql`SELECT email FROM room_members WHERE room_code = ${code} ORDER BY joined_at`;
       const queue = await sql`SELECT q.id AS qid, s.id, s.title, s.artist FROM room_queue q
-                              JOIN songs s ON s.id = q.song_id WHERE q.room_code = ${code} ORDER BY q.id`;
+                              JOIN songs s ON s.id = q.song_id WHERE q.room_code = ${code} ORDER BY q.added_at, q.id`;
       const reactions = await sql`SELECT id, emoji FROM room_reactions
                                   WHERE room_code = ${code} AND created_at > NOW() - INTERVAL '20 seconds'
                                   ORDER BY id DESC LIMIT 20`;
@@ -145,13 +145,25 @@ export default async function handler(req, res) {
           await sql`INSERT INTO room_queue (room_code, song_id) VALUES (${code}, ${songId})`;
         }
       } else if (kind === 'next') {
-        const nxt = await sql`SELECT id, song_id FROM room_queue WHERE room_code = ${code} ORDER BY id LIMIT 1`;
+        const nxt = await sql`SELECT id, song_id FROM room_queue WHERE room_code = ${code} ORDER BY added_at, id LIMIT 1`;
         if (nxt.length) {
           await sql`DELETE FROM room_queue WHERE id = ${nxt[0].id}`;
           await sql`UPDATE rooms SET current_song_id = ${nxt[0].song_id}, position = 0, playing = true, updated_at = NOW()
                     WHERE code = ${code}`;
         } else {
           await sql`UPDATE rooms SET playing = false, position = 0, updated_at = NOW() WHERE code = ${code}`;
+        }
+      } else if (kind === 'move') {
+        // swap the queue position of one row with its neighbour (queue order = added_at, id)
+        const qid = Number(body.qid);
+        const dir = body.dir === -1 ? -1 : 1;
+        const rows = await sql`SELECT id, added_at FROM room_queue WHERE room_code = ${code} ORDER BY added_at, id`;
+        const i = rows.findIndex((r) => Number(r.id) === qid);
+        const j = i + dir;
+        if (i >= 0 && j >= 0 && j < rows.length) {
+          await sql`UPDATE room_queue SET added_at = CASE WHEN id = ${rows[i].id} THEN ${rows[j].added_at}::timestamptz
+                                                     ELSE ${rows[i].added_at}::timestamptz END
+                    WHERE id IN (${rows[i].id}, ${rows[j].id})`;
         }
       } else {
         return res.status(400).json({ error: 'unknown action' });
