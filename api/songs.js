@@ -1,17 +1,9 @@
 import { neon } from '@neondatabase/serverless';
-import { del } from '@vercel/blob';
+import { isOurFileUrl, deleteFiles } from '../lib/storage.js';
 import { userFromRequest, isSuspended, NOT_CONFIGURED } from '../lib/auth.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_LYRICS = 200000;   // characters
-
-// only links to files in our own Blob store may be saved
-function isOurBlobUrl(url) {
-  try {
-    const u = new URL(url);
-    return u.protocol === 'https:' && u.hostname.endsWith('.public.blob.vercel-storage.com');
-  } catch { return false; }
-}
 
 // year is optional; keep it only when it is a plausible year
 function yearOrNull(v) {
@@ -62,11 +54,11 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
       const { title, artist, url, size } = body;
-      if (!url || typeof url !== 'string' || !isOurBlobUrl(url)) {
+      if (!url || typeof url !== 'string' || !isOurFileUrl(url)) {
         return res.status(400).json({ error: 'a valid uploaded file url is required' });
       }
       const cover = typeof body.cover_url === 'string' && body.cover_url ? body.cover_url : null;
-      if (cover && !isOurBlobUrl(cover)) return res.status(400).json({ error: 'a valid cover url is required' });
+      if (cover && !isOurFileUrl(cover)) return res.status(400).json({ error: 'a valid cover url is required' });
       const lyrics = typeof body.lyrics === 'string' && body.lyrics.trim()
         ? body.lyrics.slice(0, MAX_LYRICS) : null;
       const year = yearOrNull(body.year);
@@ -103,7 +95,7 @@ export default async function handler(req, res) {
       const rows = await sql`DELETE FROM songs WHERE id = ${id} AND user_id = ${userId} RETURNING url, cover_url`;
       if (!rows.length) return res.status(404).json({ error: 'not found' });
       // best effort: free the audio file and the cover too; the DB row is already gone
-      try { await del([rows[0].url, rows[0].cover_url].filter(Boolean)); } catch (e) { console.error('blob delete failed', e.message); }
+      try { await deleteFiles([rows[0].url, rows[0].cover_url]); } catch (e) { console.error('blob delete failed', e.message); }
       return res.status(200).json({ ok: true });
     }
 

@@ -1,5 +1,5 @@
 // LPPlayer service worker: app shell only (network-first). Never caches /api/* or audio.
-const CACHE = 'lpplayer-shell-v11';
+const CACHE = 'lpplayer-shell-v12';
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {

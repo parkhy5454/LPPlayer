@@ -2239,53 +2239,44 @@
       return out;
     }
 
-    // 1) our server checks the signed-in account and issues a short-lived upload token
-    // 2) the browser sends the file straight to Blob; a 3-minute limit stops a stalled transfer
-    async function putBlob(file, pathname, contentType) {
-      const clientPayload = JSON.stringify({ token: getToken() });
-      const tokRes = await fetch('/api/blob-token', {
+    // 1) our server checks the signed-in account and returns a short-lived signed upload address
+    // 2) the browser sends the file straight to storage; a 3-minute limit stops a stalled transfer
+    async function putFile(file, pathname, contentType) {
+      const tokRes = await fetch('/api/upload-url', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'blob.generate-client-token', payload: { pathname, callbackUrl: location.origin + '/api/blob-token', multipart: false, clientPayload } })
+        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({ pathname, contentType, size: file.size })
       });
       const tok = await tokRes.json().catch(() => ({}));
-      if (!tokRes.ok || !tok.clientToken) throw new Error(tok.error || T('uploadFail'));
+      if (!tokRes.ok || !tok.uploadUrl) throw new Error(tok.error || T('uploadFail'));
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), 180000);
-      let putRes, putText;
+      let putRes;
       try {
-        putRes = await fetch(`https://blob.vercel-storage.com/${encodeURI(pathname)}`, {
+        putRes = await fetch(tok.uploadUrl, {
           method: 'PUT',
-          headers: {
-            authorization: `Bearer ${tok.clientToken}`,
-            'x-api-version': '7',
-            // same format the SDK uses: <store id from the token>:<time>:<random>
-            'x-api-blob-request-id': `${tok.clientToken.split('_')[3] || ''}:${Date.now()}:${Math.random().toString(16).slice(2)}`,
-            'x-api-blob-request-attempt': '0',
-            'x-content-type': contentType
-          },
+          headers: { 'Content-Type': contentType },
           body: file,
           signal: ac.signal
         });
-        putText = await putRes.text();
       } catch (err) {
         if (err.name === 'AbortError') throw new Error(T('timeout'));
         throw err;
       } finally { clearTimeout(timer); }
       if (!putRes.ok) throw new Error(T('uploadFail'));
-      return JSON.parse(putText);
+      return { url: tok.url };
     }
 
     async function uploadOne(file, onPct, meta = {}) {
       if (file.size > MAX_UPLOAD) throw new Error(T('tooBig'));
-      // unique prefix: Blob is called with addRandomSuffix:false, so equal names would overwrite
+      // unique prefix so two files with the same name never collide
       const safe = file.name.replace(/[^A-Za-z0-9._-]/g, '_').slice(-120);
       const pathname = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`;
-      const blob = await putBlob(file, pathname, mimeFor(file));
+      const blob = await putFile(file, pathname, mimeFor(file));
       let coverUrl = null;
       if (meta.cover) {
         try {
-          const c = await putBlob(meta.cover, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-cover.jpg`, 'image/jpeg');
+          const c = await putFile(meta.cover, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-cover.jpg`, 'image/jpeg');
           coverUrl = c.url;
         } catch {}   // a cover that fails to upload never blocks the song itself
       }

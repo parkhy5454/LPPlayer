@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import { del } from '@vercel/blob';
+import { deleteFiles } from '../lib/storage.js';
 import { userFromRequest, isAdminEmail, NOT_CONFIGURED } from '../lib/auth.js';
 
 // Admin tools. Only accounts listed in ADMIN_EMAILS get anything but 403.
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
       const rows = await sql`DELETE FROM songs WHERE id = ${id} RETURNING url, cover_url`;
       if (!rows.length) return res.status(404).json({ error: 'not found' });
       // best effort: the row is already gone, the audio file is freed as well
-      try { await del([rows[0].url, rows[0].cover_url].filter(Boolean)); } catch (e) { console.error('blob delete failed', e.message); }
+      try { await deleteFiles([rows[0].url, rows[0].cover_url]); } catch (e) { console.error('blob delete failed', e.message); }
       return res.status(200).json({ ok: true });
     }
 

@@ -3,6 +3,8 @@
   "version": "10.0.0",
   "type": "module",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1159.0",
+    "@aws-sdk/s3-request-presigner": "^3.1159.0",
     "@neondatabase/serverless": "^0.10.0",
     "@vercel/blob": "^0.23.4",
     "bcryptjs": "^2.4.3",
